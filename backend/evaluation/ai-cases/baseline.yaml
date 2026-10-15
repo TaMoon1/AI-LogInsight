@@ -1,0 +1,82 @@
+family: 核心研判（正常 / 异常 / 证据不足 / 多事件 / 误报）
+description: |
+  AI 研判质量的基线用例。标注口径参照 DiogoRibeiro7/ai-incident-analysis-agent 的
+  benchmark 约定：**默认精确，仅在证据本身歧义时才放宽**——歧义是数据集的属性，
+  不是门禁的宽容。因此 `risk_levels` 只列出「本用例下都算对」的等级，
+  不为了好过门禁而全局放宽；`forbid_risk_levels` 用来抓严重等级错误。
+
+  期望值全部基于 parser / analyzer 的实测行为，不是推测。
+
+  标记 `smoke: true` 的用例构成**最小回归集**：Prompt 或 AI 相关代码一改就该跑，
+  随 `pytest` 自动执行。它们体量都很小（1~21 行），秒级完成，因此可以每次都跑。
+  完整评测（含 3000 行的规模用例）留给扩大样本集或发布前。
+cases:
+  - name: normal-health-check
+    note: 单条正常健康检查，不应产生任何可疑行为结论
+    file: access.log
+    smoke: true
+    log: |
+      203.0.113.10 - - [29/Sep/2026:09:10:00 +0800] "GET /health HTTP/1.1" 200 12 "-" "Mozilla/5.0"
+    expect:
+      suspicious: false
+      risk_levels: [info, low]
+      forbid_risk_levels: [high, critical]
+
+  - name: obvious-sensitive-path
+    note: 探测 /.env 被 403 拒绝，属于明显的异常探测行为
+    file: access.log
+    smoke: true
+    log: |
+      203.0.113.11 - - [29/Sep/2026:09:10:00 +0800] "GET /.env HTTP/1.1" 403 12 "-" "curl/8.0"
+    expect:
+      suspicious: true
+      risk_levels: [medium, high]
+      forbid_risk_levels: [critical]
+      min_behaviors: 1
+      evidence_keywords: ["203.0.113.11"]
+
+  - name: insufficient-evidence
+    note: 无法识别的文本，必须明确「无法确认」而不是编造结论（AGENTS.md §16）
+    file: unknown.log
+    # 这条用例的输入**故意**解析不出任何记录：检验的正是「无证据时不许编造」。
+    unparseable: true
+    smoke: true
+    log: |
+      not a recognized log record
+    expect:
+      suspicious: false
+      risk_levels: [info, low]
+      forbid_risk_levels: [high, critical]
+
+  - name: correlated-failures-then-success
+    note: |
+      同一来源 20 次失败聚集后成功登录，多事件关联应升级为高风险。
+      实测：20 次失败触发 `ssh.bruteforce`（medium），随后 2 分钟内成功登录
+      升级为 `ssh.bruteforce.success`（high）——所以 high 是期望值，不是宽容。
+    file: auth.log
+    smoke: true
+    generator:
+      kind: repeat
+      times: 20
+      template: |
+        Sep 29 09:00:00 host sshd[1]: Failed password for root from 203.0.113.12 port 40001 ssh2
+    append: |
+      Sep 29 09:02:00 host sshd[22]: Accepted password for root from 203.0.113.12 port 40022 ssh2
+    expect:
+      suspicious: true
+      risk_levels: [high, critical]
+      min_behaviors: 1
+      evidence_keywords: ["203.0.113.12"]
+
+  - name: benign-monitor-polling
+    note: |
+      误报场景：监控探针高频访问 /health，账号字段为 admin 容易触发「特权账号」误判。
+      两次请求远低于阈值，不应升级为高风险。
+    file: access.log
+    log: |
+      203.0.113.13 - admin [29/Sep/2026:09:10:00 +0800] "GET /health HTTP/1.1" 200 12 "-" "monitor"
+      203.0.113.13 - admin [29/Sep/2026:09:11:00 +0800] "GET /health HTTP/1.1" 200 12 "-" "monitor"
+    expect:
+      suspicious: false
+      risk_levels: [info, low]
+      forbid_risk_levels: [high, critical]

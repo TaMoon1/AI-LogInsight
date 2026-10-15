@@ -1,0 +1,1094 @@
+# Windows Sysmon 行为规则：进程、命令行、外联目标（EVTX 二进制与 XML 文本导出共用）
+#
+# 判据字段（process_image / command_line / parent_image / target_filename 等）
+# 由 services/evtx.py 从 EventData 映射而来；认证类规则见 20-windows.yaml。
+# 摘要可用占位符：{asset} 主机名、{image} 进程镜像、{count} 命中次数。
+
+source: builtin
+
+# 文档级元数据：本文件内全部规则共用；规则级声明优先（见 rules_engine.build_rule）。
+metadata:
+  author: AI-LogInsight
+  version: "1.0"
+  license: proprietary
+  validation_status: validated
+
+rules:
+  - id: windows.lolbin_download
+    title: 系统自带工具载荷下载
+    description: mshta、certutil、IMEWDBLD 等系统自带工具执行了带网络地址的命令行，常被用于下载后续载荷。
+    level: high
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_LOLBIN_DOWNLOAD_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [mshta.exe, rundll32.exe, regsvr32.exe, imewdbld.exe, certutil.exe, bitsadmin.exe, curl.exe, wscript.exe, cscript.exe, msiexec.exe, installutil.exe, hh.exe, forfiles.exe, makecab.exe]
+          - field: command_line
+            op: any_contains
+            values: ["http://", "https://", "ftp://"]
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: lolbin_download
+      name: 疑似系统自带工具载荷下载
+      level: high
+      summary: "{asset} 上系统自带工具 {image} 执行了包含网络地址的命令行（{count} 次），疑似被用于下载后续载荷，需核实该命令的来源与用途。"
+
+  - id: windows.suspicious_executable_in_temp
+    title: 临时目录或其他可写目录执行程序
+    description: 从用户临时目录、系统临时目录、浏览器缓存或公共可写目录执行程序，常为钓鱼载荷的落地与执行位置。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_TEMP_EXECUTION_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        # 只统计进程创建事件（Sysmon Event ID 1）；EID 3/11/23 的 Image 同样落在缓存目录，
+        # 但那是该进程的网络与文件行为，不应重复计入「执行」次数。
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_contains
+            values: ['\appdata\local\temp\', '\windows\temp\', '\inetcache\', '\downloads\', '\users\public\']
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: suspicious_temp_execution
+      name: 疑似从临时或缓存目录执行程序
+      level: medium
+      summary: "{asset} 上从临时或缓存目录执行了程序 {image}（{count} 次），需核实该程序的落地时间、来源与执行者。"
+
+  - id: windows.archive_with_password
+    title: 压缩工具使用密码参数打包
+    description: 7-Zip / RAR 等压缩工具带密码参数打包，常见于数据外传前的收集暂存与规避检测。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_ARCHIVE_WITH_PASSWORD_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [7z.exe, 7za.exe, 7zr.exe, rar.exe, winrar.exe, zip.exe]
+          - field: command_line
+            op: regex
+            value: '(^|\s)-(p|hp)\S|-mem=aes256'
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: archive_with_password
+      name: 疑似使用密码压缩打包数据
+      level: medium
+      summary: "{asset} 上压缩工具 {image} 使用密码参数打包数据（{count} 次），疑似为外传前收集暂存，需核实打包内容、输出位置与操作者。"
+
+  - id: windows.masquerade_extension
+    title: 伪装扩展名执行
+    description: 进程镜像使用文档、图片或压缩包扩展名，属于典型的伪装执行（T1036.008），正常软件不会以这些扩展名直接执行。
+    level: high
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_MASQUERADE_EXTENSION_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [.epub, .pdf, .doc, .docx, .xls, .xlsx, .ppt, .pptx, .jpg, .jpeg, .png, .gif, .bmp, .txt, .log, .csv, .xml, .zip, .rar, .7z, .iso, .img, .lnk, .url, .hta]
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: masquerade_extension
+      name: 疑似伪装扩展名执行
+      level: high
+      summary: "{asset} 上以非可执行扩展名执行了进程 {image}（{count} 次），疑似伪装文件类型绕过检测，需核实该文件来源与内容。"
+
+  - id: windows.credential_file_access
+    title: 凭据文件访问或清理
+    description: 出现浏览器凭据库、SSH 私钥、云凭证等敏感文件的创建与删除记录，常见于凭据收集与痕迹清理（T1555 / T1070.004）。
+    level: high
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_CREDENTIAL_FILE_ACCESS_ENABLED
+    detection:
+      where:
+        - {field: target_filename, op: exists}
+      any:
+        - - field: target_filename
+            op: any_contains
+            values: ['passwords.txt', 'cookies.txt', 'login data', 'id_rsa', 'id_ed25519', '.ssh\', 'credentials.xml', '.aws\credentials', 'web.config', 'unattend.xml', 'ntds.dit', '.kdbx', 'wallet.dat']
+      aggregate:
+        group_by: [target_filename]
+        bucket: true
+    event:
+      type: credential_file_access
+      name: 疑似访问或清理凭据文件
+      level: high
+      summary: "{asset} 上出现凭据或配置文件 {file} 的文件操作记录（{count} 次），疑似凭据收集或痕迹清理，需核实操作进程与后续外传。"
+
+  - id: windows.payload_cleanup
+    title: 落地程序删除
+    description: 临时目录或缓存目录中的可执行文件被删除，符合落地执行后自清理（T1070.004）。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_PAYLOAD_CLEANUP_ENABLED
+    detection:
+      where:
+        - {field: target_filename, op: exists}
+        - {field: status, op: equals, value: "23"}
+      any:
+        - - field: target_filename
+            op: any_contains
+            values: ['\appdata\local\temp\', '\windows\temp\', '\inetcache\', '\downloads\', '\users\public\']
+          - field: target_filename
+            op: any_endswith
+            values: [.exe, .dll, .scr, .ps1, .bat, .cmd, .vbs, .js, .hta, .lnk]
+      aggregate:
+        group_by: [target_filename]
+        bucket: true
+    event:
+      type: payload_cleanup
+      name: 疑似落地程序删除
+      level: medium
+      summary: "{asset} 上临时或缓存目录中的可执行文件 {file} 被删除（{count} 次），疑似执行后清理痕迹，需结合该文件的创建与执行记录核实。"
+
+  - id: windows.registry_certificate_store
+    title: 证书策略注册表写入
+    description: 写入 SystemCertificates 等证书策略注册表位置，可用于植入根证书实现流量劫持或长期信任（T1553.004）。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_REGISTRY_CERT_STORE_ENABLED
+    detection:
+      where:
+        - {field: registry_key, op: exists}
+      any:
+        - - field: registry_key
+            op: any_contains
+            values: ['systemcertificates', '\disallowed', 'policies\microsoft\system']
+      aggregate:
+        group_by: [registry_key]
+        bucket: true
+    event:
+      type: certificate_store_modify
+      name: 疑似证书策略注册表写入
+      level: medium
+      summary: "{asset} 上出现证书策略注册表写入 {registry}（{count} 次），疑似植入信任证书以劫持流量，需核实操作进程与预期变更。"
+
+  - id: windows.suspicious_dns_query
+    title: 可疑域名解析
+    description: DNS 查询的域名为超长随机串或大量重复字符，符合 DGA 或回连探测特征（T1071.004）。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_SUSPICIOUS_DNS_ENABLED
+    detection:
+      where:
+        - {field: query_name, op: exists}
+      any:
+        - - field: query_name
+            op: regex
+            value: '(^[a-z0-9]{16,}\.)|(.)\2{7,}'
+      aggregate:
+        group_by: [query_name]
+        bucket: true
+    event:
+      type: suspicious_dns_query
+      name: 疑似可疑域名解析
+      level: medium
+      summary: "{asset} 上发起可疑域名查询 {query}（{count} 次），域名结构符合随机生成或回连特征，需核实发起进程与解析结果。"
+
+  - id: windows.discovery_command
+    title: 主机信息发现命令反复执行
+    description: 同一主机在时间窗口内反复执行主机或系统信息收集命令，符合攻击链中的发现阶段（T1082）。
+    level: low
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_DISCOVERY_COMMAND_ENABLED
+    threshold: 3
+    threshold_env: WINDOWS_DISCOVERY_THRESHOLD
+    window_seconds: 300
+    window_env: WINDOWS_DISCOVERY_WINDOW_SECONDS
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [hostname.exe, whoami.exe, systeminfo.exe, ipconfig.exe, net.exe, net1.exe, nltest.exe, quser.exe, qwinsta.exe, tasklist.exe, arp.exe, nslookup.exe, route.exe]
+      aggregate:
+        group_by:
+          - {field: target_asset, default: unknown}
+          - process_image
+        count_gte: 3
+        window_seconds: 300
+    event:
+      type: discovery_command
+      name: 疑似主机信息发现命令反复执行
+      level: low
+      summary: "{asset} 在 {window} 秒内反复执行主机信息发现命令 {image}（{count} 次），该命令单独出现多为正常，重复执行需结合父进程与时间线核实。"
+
+  - id: windows.payload_outbound_connection
+    title: 落地程序发起网络外联
+    description: 位于临时目录、浏览器缓存或下载目录的程序发起网络连接，符合载荷回连或数据外传特征。
+    level: high
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_PAYLOAD_OUTBOUND_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: destination_ip, op: exists}
+        # Sysmon Event ID 3 = 网络连接
+        - {field: status, op: equals, value: "3"}
+      any:
+        - - field: process_image
+            op: any_contains
+            values: ['\appdata\local\temp\', '\windows\temp\', '\inetcache\', '\downloads\', '\users\public\']
+      aggregate:
+        group_by: [destination_ip]
+        bucket: true
+    event:
+      type: payload_outbound_connection
+      name: 疑似落地程序发起网络外联
+      level: high
+      summary: "{asset} 上位于临时/缓存目录的程序 {image} 向 {destination} 发起网络连接（{count} 次），需核实该外联是否为载荷回连或数据外传。"
+
+  - id: windows.executable_drop_in_temp
+    title: 可执行文件落地到临时目录
+    description: 可执行或脚本文件被写入临时目录、缓存目录或公共可写目录，是钓鱼载荷落地的典型位置，通常发生在执行之前。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_EXECUTABLE_DROP_ENABLED
+    detection:
+      where:
+        - {field: target_filename, op: exists}
+        # Sysmon Event ID 11 = 文件创建
+        - {field: status, op: equals, value: "11"}
+      any:
+        - - field: target_filename
+            op: any_contains
+            values: ['\appdata\local\temp\', '\windows\temp\', '\inetcache\', '\downloads\', '\users\public\']
+          - field: target_filename
+            op: any_endswith
+            values: [.exe, .dll, .scr, .ps1, .bat, .cmd, .vbs, .js, .hta, .lnk]
+      aggregate:
+        group_by: [target_filename]
+        bucket: true
+    event:
+      type: executable_drop_in_temp
+      name: 疑似可执行文件落地到临时目录
+      level: medium
+      summary: "{asset} 上可执行文件 {file} 被写入临时或缓存目录（{count} 次），疑似载荷落地，需在该文件被执行前核实其来源与哈希。"
+
+  - id: windows.registry_bulk_write
+    title: 非系统目录进程批量写入注册表
+    description: 位于用户可写目录的进程在短时间内批量写入注册表键，常见于配置篡改或持久化；合法安装程序多由系统目录进程执行，故该规则刻意限定进程位置以控制误报。
+    level: low
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_REGISTRY_BULK_ENABLED
+    threshold: 10
+    threshold_env: WINDOWS_REGISTRY_BULK_THRESHOLD
+    window_seconds: 60
+    window_env: WINDOWS_REGISTRY_BULK_WINDOW_SECONDS
+    detection:
+      where:
+        - {field: registry_key, op: exists}
+        - {field: process_image, op: exists}
+        # Sysmon Event ID 12 = 注册表对象创建或删除
+        - {field: status, op: equals, value: "12"}
+      any:
+        - - field: process_image
+            op: any_contains
+            values: ['\appdata\local\temp\', '\windows\temp\', '\inetcache\', '\downloads\', '\users\public\']
+      aggregate:
+        group_by: [process_image]
+        count_gte: 10
+        window_seconds: 60
+    event:
+      type: registry_bulk_write
+      name: 疑似非系统进程批量写入注册表
+      level: low
+      summary: "{asset} 上位于用户可写目录的进程 {image} 在 {window} 秒内写入 {count} 条注册表键，疑似配置篡改或持久化，需确认该进程是否为合法安装程序。"
+
+  - id: windows.script_interpreter_encoded
+    title: 脚本解释器执行编码或隐藏窗口命令
+    description: 命令行解释器带编码参数（-enc / -EncodedCommand / FromBase64String）或以「隐藏窗口 + 不加载配置文件 / 绕过执行策略」组合启动，是免杀载荷与钓鱼脚本的典型加载方式。刻意不匹配 `-File`、明文 `-Command` 与 `IEX + 下载`：前者是正常运维写法，后者在 Chocolatey 等软件分发脚本里同样常见，误报不可接受（这类判断交给 AI 研判层结合其他信号做）。
+    level: high
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_SCRIPT_INTERPRETER_ENCODED_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        # 只统计进程创建（Sysmon Event ID 1）
+        - {field: status, op: equals, value: "1"}
+      any:
+        # ① 编码命令：命令行里出现编码参数或 Base64 解码调用
+        - - field: process_image
+            op: any_endswith
+            values: [powershell.exe, pwsh.exe, wscript.exe, cscript.exe]
+          - field: command_line
+            op: any_contains
+            values: ["-encodedcommand", "-enc ", "frombase64string", "base64string"]
+        # ② 隐藏窗口 + 不加载配置文件 / 绕过执行策略（单独任一项都太常见，必须同时出现）
+        - - field: process_image
+            op: any_endswith
+            values: [powershell.exe, pwsh.exe]
+          - field: command_line
+            op: any_contains
+            values: ["-windowstyle hidden", "-w hidden"]
+          - field: command_line
+            op: any_contains
+            values: ["-nop", "-noprofile", "bypass", "-executionpolicy"]
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: script_interpreter_encoded
+      name: 疑似编码或隐藏命令执行
+      level: high
+      summary: "{asset} 上 {image} 执行了编码或隐藏窗口命令（{count} 次），疑似免杀载荷或钓鱼脚本加载，需还原命令行原文并核实其父进程与文件来源。"
+
+  - id: windows.command_shell_suspicious_parent
+    title: 可疑父进程启动命令行解释器
+    description: 文档编辑器（Word / Excel / PowerPoint）、压缩工具、脚本宿主或 mshta 等非交互式进程启动 cmd.exe，是钓鱼附件与「解压即执行」的典型链路。刻意不匹配 explorer.exe、终端服务、计划任务与运维工具启动的 cmd —— 那是正常运维，列进来误报不可接受。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_COMMAND_SHELL_PARENT_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: parent_image, op: exists}
+        # 只统计进程创建（Sysmon Event ID 1）
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [cmd.exe]
+          - field: parent_image
+            op: any_endswith
+            values: [winword.exe, excel.exe, powerpnt.exe, outlook.exe, mspub.exe, wscript.exe, cscript.exe, mshta.exe, 7z.exe, 7za.exe, 7zr.exe, winrar.exe, rar.exe, winzip32.exe]
+      aggregate:
+        group_by: [parent_image]
+        bucket: true
+    event:
+      type: suspicious_command_shell
+      name: 可疑父进程启动命令行
+      level: medium
+      summary: "{asset} 上 {parent} 启动了命令行解释器 {image}（{count} 次），疑似钓鱼文档或解压即执行链，需核实该文档/压缩包来源与命令行内容。"
+
+  - id: windows.scheduled_task_persistence
+    title: 计划任务创建持久化
+    description: schtasks 或 PowerShell 创建计划任务，常用于持久化或定时执行载荷；查询、删除、普通枚举不纳入该规则。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_SCHEDULED_TASK_PERSISTENCE_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        # 只统计进程创建（Sysmon Event ID 1）
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [schtasks.exe]
+          - field: command_line
+            op: any_contains
+            transform: lower
+            values: ["/create", "-create"]
+        - - field: process_image
+            op: any_endswith
+            values: [powershell.exe, pwsh.exe]
+          - field: command_line
+            op: any_contains
+            values: ["Register-ScheduledTask", "New-ScheduledTask"]
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: scheduled_task_persistence
+      name: 疑似计划任务持久化
+      level: medium
+      summary: "{asset} 上 {image} 创建了计划任务（{count} 次），疑似持久化或定时载荷执行，需核实任务名称、触发条件与执行路径。"
+
+  # ==========================================================================
+  # 影响（Impact）——原规则库在该战术下为空白
+  # ==========================================================================
+
+  - id: windows.inhibit_recovery
+    title: 破坏系统恢复能力
+    description: 删除卷影副本、删除备份目录或关闭恢复环境，是勒索软件加密前的标准准备动作（T1490）。这类命令在正常业务终端上几乎不会出现，因此不需要聚合即可告警。
+    level: high
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_INHIBIT_RECOVERY_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        # 只统计进程创建（Sysmon Event ID 1）
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [vssadmin.exe]
+          - field: command_line
+            op: regex
+            value: 'delete\s+shadows'
+        - - field: process_image
+            op: any_endswith
+            values: [wbadmin.exe]
+          - field: command_line
+            op: regex
+            value: 'delete\s+(catalog|backup)'
+        - - field: process_image
+            op: any_endswith
+            values: [bcdedit.exe]
+          - field: command_line
+            op: regex
+            value: 'recoveryenabled\s+no|bootstatuspolicy\s+ignoreallfailures'
+        - - field: process_image
+            op: any_endswith
+            values: [wmic.exe]
+          - field: command_line
+            op: regex
+            value: 'shadowcopy\s+delete'
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: inhibit_recovery
+      name: 疑似破坏系统恢复能力
+      level: high
+      summary: "{asset} 上 {image} 执行了破坏系统恢复能力的命令（{count} 次），疑似勒索软件加密前的准备动作，需立即核实该主机的备份与卷影副本状态。"
+
+  - id: windows.ransomware_extension
+    title: 文件被追加勒索扩展名
+    description: 文件创建事件中出现勒索软件特征扩展名（T1486）。词表刻意只收窄到与勒索家族强绑定的后缀，不收 `.enc`、`.crypto` 这类正常加密工具也会使用的通用后缀。
+    level: high
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_RANSOMWARE_EXTENSION_ENABLED
+    detection:
+      where:
+        - {field: target_filename, op: exists}
+        # Sysmon Event ID 11 = 文件创建
+        - {field: status, op: equals, value: "11"}
+      any:
+        - - field: target_filename
+            op: any_endswith
+            values: [.lockbit, .conti, .ryuk, .revil, .dharma, .phobos, .makop, .djvu, .wncry, .wcry, .zepto, .cerber, .locky, .locked]
+      aggregate:
+        group_by: [target_filename]
+        bucket: true
+    event:
+      type: ransomware_extension
+      name: 疑似勒索软件加密文件
+      level: high
+      summary: "{asset} 上出现带勒索扩展名的文件 {file}（{count} 次），疑似文件已被加密，需立即核实同类文件数量、加密进程与备份可用性。"
+
+  - id: windows.security_service_stop
+    title: 停止或删除安全与日志服务
+    description: 停止、删除安全防护或日志采集服务（T1489），是攻击者关闭检测能力的常见手段；正常运维很少对防护类服务做停删操作。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_SECURITY_SERVICE_STOP_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [net.exe, net1.exe, sc.exe]
+          - field: command_line
+            op: regex
+            value: '(stop|delete|config)\s+\S*(windefend|wdnsvc|wscsvc|sense|eventlog|sysmon|winlogbeat|csagent|mpsvc|sophos|symantec|mcafee|ekrn)'
+        - - field: process_image
+            op: any_endswith
+            values: [taskkill.exe]
+          - field: command_line
+            op: regex
+            value: '/im\s+\S*(msmpeng|windefend|csagent|ekrn|avp|sophos)'
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: security_service_stop
+      name: 疑似停止安全或日志服务
+      level: medium
+      summary: "{asset} 上 {image} 对安全或日志服务执行了停用/删除操作（{count} 次），疑似关闭检测能力，需核实操作者身份与后续是否出现其他异常。"
+
+  - id: windows.data_destruction
+    title: 数据销毁工具执行
+    description: 使用系统自带工具擦除磁盘空闲空间或安全删除文件（T1485），常见于破坏数据可用性或抹除痕迹。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_DATA_DESTRUCTION_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [cipher.exe]
+          - field: command_line
+            op: regex
+            value: '/w(\s|:|$)'
+        - - field: process_image
+            op: any_endswith
+            values: [sdelete.exe, sdelete64.exe]
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: data_destruction
+      name: 疑似执行数据销毁
+      level: medium
+      summary: "{asset} 上 {image} 执行了数据擦除操作（{count} 次），疑似破坏数据可用性或抹除痕迹，需核实目标路径与操作意图。"
+
+  # ==========================================================================
+  # 凭证访问（Credential Access）
+  # ==========================================================================
+
+  - id: windows.lsass_memory_dump
+    title: LSASS 进程内存转储
+    description: 转储 LSASS 进程内存以提取登录凭据（T1003.001），是最主流的凭据窃取手法。正常软件不会去读 LSASS 的内存，因此该行为一旦出现即可疑。
+    level: critical
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_LSASS_DUMP_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [procdump.exe, procdump64.exe, dumpit.exe]
+          - field: command_line
+            op: any_contains
+            values: [lsass]
+        - - field: process_image
+            op: any_endswith
+            values: [rundll32.exe]
+          - field: command_line
+            op: any_contains
+            values: [comsvcs]
+          - field: command_line
+            op: any_contains
+            values: [minidump]
+        - - field: process_image
+            op: any_endswith
+            values: [powershell.exe, pwsh.exe]
+          - field: command_line
+            op: any_contains
+            values: [lsass]
+          - field: command_line
+            op: regex
+            value: '(minidump|comsvcs|dump)'
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: lsass_memory_dump
+      name: 疑似转储 LSASS 内存窃取凭据
+      level: critical
+      summary: "{asset} 上 {image} 对 LSASS 进程执行了内存转储（{count} 次），疑似窃取登录凭据，需立即核实该主机的账号口令泄露风险并排查横向移动痕迹。"
+
+  - id: windows.sam_registry_dump
+    title: 导出 SAM / SECURITY 注册表配置单元
+    description: 导出注册表配置单元以离线提取本地账户口令哈希（T1003.002），或通过 esentutl / ntdsutil 复制活动目录数据库（T1003.003）。
+    level: critical
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_SAM_DUMP_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [reg.exe]
+          - field: command_line
+            op: regex
+            value: 'save\s+hklm\\(sam|security)'
+        - - field: process_image
+            op: any_endswith
+            values: [esentutl.exe]
+          - field: command_line
+            op: any_contains
+            values: [ntds]
+        - - field: process_image
+            op: any_endswith
+            values: [ntdsutil.exe]
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: sam_registry_dump
+      name: 疑似导出账户凭据数据库
+      level: critical
+      summary: "{asset} 上 {image} 导出了 SAM/SECURITY 注册表配置单元或活动目录数据库（{count} 次），疑似离线提取口令哈希，需立即核实导出文件去向与账号泄露范围。"
+
+  - id: windows.credential_hunting
+    title: 在文件中搜索口令
+    description: 使用 findstr 或 Select-String 在文件内容中搜索口令关键字（T1552.001），是拿到主机后批量寻找明文凭据的典型手法。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_CREDENTIAL_HUNTING_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [findstr.exe]
+          - field: command_line
+            op: regex
+            value: '/si\s'
+          - field: command_line
+            op: regex
+            value: '(password|passwd|pwd|credential|secret)'
+        - - field: process_image
+            op: any_endswith
+            values: [powershell.exe, pwsh.exe]
+          - field: command_line
+            op: any_contains
+            values: [select-string]
+          - field: command_line
+            op: regex
+            value: '(password|credential|secret)'
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: credential_hunting
+      name: 疑似在文件中搜索口令
+      level: medium
+      summary: "{asset} 上 {image} 递归搜索了包含口令关键字的文件内容（{count} 次），疑似批量寻找明文凭据，需核实搜索范围与命中的文件。"
+
+  # ==========================================================================
+  # 防御规避（Defense Evasion）
+  # ==========================================================================
+
+  - id: windows.eventlog_cleared
+    title: 清空 Windows 事件日志
+    description: 清除事件日志以抹除入侵痕迹（T1070.001），是反取证的第一步。正常运维极少清日志，因此单次出现即可疑。
+    level: high
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_EVENTLOG_CLEARED_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [wevtutil.exe]
+          - field: command_line
+            op: regex
+            value: '\bcl\b|\bclear-log\b'
+        - - field: process_image
+            op: any_endswith
+            values: [powershell.exe, pwsh.exe]
+          - field: command_line
+            op: any_contains
+            values: [clear-eventlog, remove-eventlog, "wevtutil cl"]
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: eventlog_cleared
+      name: 疑似清空事件日志
+      level: high
+      summary: "{asset} 上 {image} 执行了事件日志清除操作（{count} 次），疑似抹除入侵痕迹，需核实操作者身份，并检查该主机此前是否存在其他异常行为。"
+
+  - id: windows.defender_exclusion_added
+    title: 添加防护软件排除项
+    description: 通过 PowerShell 为防护软件添加路径/进程排除项或关闭实时监控（T1562.001），是攻击者让载荷免于查杀的常用手段。
+    level: high
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_DEFENDER_EXCLUSION_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [powershell.exe, pwsh.exe]
+          - field: command_line
+            op: any_contains
+            values: ["add-mppreference", "set-mppreference"]
+          - field: command_line
+            op: regex
+            value: '(exclusionpath|exclusionprocess|exclusionextension|disablerealtimemonitoring|disablebehaviormonitoring|disableioavprotection)'
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: defender_exclusion_added
+      name: 疑似添加防护排除项
+      level: high
+      summary: "{asset} 上 {image} 修改了防护软件的排除项或监控开关（{count} 次），疑似为载荷规避查杀，需核实排除路径与后续落地的文件。"
+
+  - id: windows.certutil_decode
+    title: certutil 解码或缓存下载
+    description: certutil 被用于 Base64 解码落地载荷或通过 URL 缓存下载文件（T1140），属于典型的系统自带工具滥用。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_CERTUTIL_DECODE_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [certutil.exe]
+          - field: command_line
+            op: any_contains
+            values: ["-decode", "/decode", "-decodehex", "/decodehex", "-urlcache", "/urlcache"]
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: certutil_decode
+      name: 疑似 certutil 解码或下载
+      level: medium
+      summary: "{asset} 上 certutil 执行了解码或 URL 缓存操作（{count} 次），疑似解码落地载荷或下载文件，需核实输入来源与输出文件路径。"
+
+  - id: windows.uac_bypass
+    title: UAC 绕过注册表劫持
+    description: 写入 ms-settings / mscfile 的 shell\open\command 键值，是 fodhelper、eventvwr 等自动提权程序被劫持的经典 UAC 绕过手法（T1548.002）。这些键在正常系统上不会被创建。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_UAC_BYPASS_ENABLED
+    detection:
+      where:
+        - {field: registry_key, op: exists}
+      any:
+        - - field: registry_key
+            op: any_contains
+            values: ['ms-settings\shell\open\command', 'mscfile\shell\open\command']
+      aggregate:
+        group_by: [registry_key]
+        bucket: true
+    event:
+      type: uac_bypass
+      name: 疑似 UAC 绕过注册表劫持
+      level: medium
+      summary: "{asset} 上出现 UAC 绕过常用的注册表劫持键 {registry}（{count} 次），疑似通过自动提权程序绕过 UAC，需核实写入的进程与键值内容。"
+
+  - id: windows.hidden_file_attrib
+    title: 设置文件隐藏与系统属性
+    description: 同时为文件设置隐藏与系统属性（T1564.001），常用于让载荷文件在默认视图下不可见。要求两个属性同时出现，避免把单独使用 `+h` 的正常整理动作当成异常。
+    level: low
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_HIDDEN_FILE_ATTRIB_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [attrib.exe]
+          - field: command_line
+            op: regex
+            value: '\+h'
+          - field: command_line
+            op: regex
+            value: '\+s'
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: hidden_file_attrib
+      name: 疑似设置文件隐藏与系统属性
+      level: low
+      summary: "{asset} 上 attrib 为文件同时设置了隐藏与系统属性（{count} 次），疑似隐藏载荷文件，需核实被操作的文件路径与来源。"
+
+  # ==========================================================================
+  # 账户操作与自启动（Persistence）
+  # ==========================================================================
+
+  - id: windows.create_local_account
+    title: 创建本地账户
+    description: 通过 net user /add 或 New-LocalUser 创建本地账户（T1136.001），常见于攻击者建立备用访问通道。正常业务终端极少本地建号。
+    level: high
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_CREATE_LOCAL_ACCOUNT_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [net.exe, net1.exe]
+          - field: command_line
+            op: regex
+            value: 'user\s+\S+\s+.*\/add'
+        - - field: process_image
+            op: any_endswith
+            values: [powershell.exe, pwsh.exe]
+          - field: command_line
+            op: any_contains
+            values: [new-localuser]
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: create_local_account
+      name: 疑似创建本地账户
+      level: high
+      summary: "{asset} 上 {image} 创建了本地账户（{count} 次），疑似建立备用访问通道，需核实新账户名称、创建者身份与后续登录记录。"
+
+  - id: windows.account_manipulation
+    title: 将账户加入管理员组
+    description: 把账户加入本地管理员组（T1098），是提权与维持访问的关键动作，正常运维通常走审批流程而非命令行直接加组。
+    level: high
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_ACCOUNT_MANIPULATION_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [net.exe, net1.exe]
+          - field: command_line
+            op: regex
+            value: '(localgroup|group)\s+\S*admin\S*\s+.*\/add'
+        - - field: process_image
+            op: any_endswith
+            values: [powershell.exe, pwsh.exe]
+          - field: command_line
+            op: any_contains
+            values: [add-localgroupmember, add-adgroupmember]
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: account_manipulation
+      name: 疑似将账户加入管理员组
+      level: high
+      summary: "{asset} 上 {image} 将账户加入了管理员组（{count} 次），疑似提权或维持访问，需核实被加入的账户与操作者身份。"
+
+  - id: windows.registry_run_key
+    title: 写入注册表自启动项
+    description: 向 Run / RunOnce 自启动键写入值（T1547.001），是最常见的持久化位置。合法安装程序也会写这里，因此定级为 medium 并需结合写入进程核实。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_REGISTRY_RUN_KEY_ENABLED
+    detection:
+      where:
+        - {field: registry_key, op: exists}
+        # Sysmon Event ID 13 = 注册表值设置
+        - {field: status, op: equals, value: "13"}
+      any:
+        - - field: registry_key
+            op: any_contains
+            values: ['\currentversion\run', '\currentversion\runonce', 'policies\explorer\run']
+      aggregate:
+        group_by: [registry_key]
+        bucket: true
+    event:
+      type: registry_run_key
+      name: 疑似写入注册表自启动项
+      level: medium
+      summary: "{asset} 上出现自启动注册表写入 {registry}（{count} 次），疑似持久化，需核实写入进程是否为合法安装程序以及指向的可执行文件。"
+
+  # ==========================================================================
+  # 发现（Discovery）
+  #
+  # 三条都要求时间窗内重复出现：单次 netstat / dir / dsquery 在运维中很常见，
+  # 只有「短时间内反复枚举」才构成发现阶段的信号，否则误报不可接受。
+  # 判据刻意避开 windows.discovery_command 已覆盖的进程清单
+  # （net.exe / net1.exe / nltest.exe / whoami.exe 等），避免同一行为被两条规则重复检出。
+  # ==========================================================================
+
+  - id: windows.network_connection_discovery
+    title: 反复枚举网络连接
+    description: 短时间内反复执行 netstat 枚举本机网络连接（T1049），用于判断已建立的会话与外联目标，是攻击链发现阶段的常见动作。
+    level: low
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_NET_CONN_DISCOVERY_ENABLED
+    threshold: 3
+    threshold_env: WINDOWS_NET_CONN_DISCOVERY_THRESHOLD
+    window_seconds: 300
+    window_env: WINDOWS_NET_CONN_DISCOVERY_WINDOW_SECONDS
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [netstat.exe]
+      aggregate:
+        group_by:
+          - {field: target_asset, default: unknown}
+          - process_image
+        count_gte: 3
+        window_seconds: 300
+    event:
+      type: network_connection_discovery
+      name: 疑似反复枚举网络连接
+      level: low
+      summary: "{asset} 在 {window} 秒内反复执行网络连接枚举命令 {image}（{count} 次），单独出现多为正常，重复执行需结合父进程与时间线核实。"
+
+  - id: windows.file_directory_discovery
+    title: 反复递归枚举文件目录
+    description: 短时间内反复递归遍历文件系统（T1083），用于定位敏感文件与可窃取的数据，是攻击链发现与收集阶段的前置动作。
+    level: low
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_FILE_DIR_DISCOVERY_ENABLED
+    threshold: 3
+    threshold_env: WINDOWS_FILE_DIR_DISCOVERY_THRESHOLD
+    window_seconds: 300
+    window_env: WINDOWS_FILE_DIR_DISCOVERY_WINDOW_SECONDS
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [cmd.exe]
+          - field: command_line
+            op: regex
+            value: '(dir|where)\s+.*\/s\b|tree\s+\/f'
+      aggregate:
+        group_by:
+          - {field: target_asset, default: unknown}
+          - process_image
+        count_gte: 3
+        window_seconds: 300
+    event:
+      type: file_directory_discovery
+      name: 疑似反复递归枚举文件目录
+      level: low
+      summary: "{asset} 在 {window} 秒内反复递归遍历文件目录（{count} 次），单独出现多为正常，重复执行需结合父进程与时间线核实其意图。"
+
+  - id: windows.account_discovery
+    title: 枚举本地或域账户
+    description: 通过 wmic 或 dsquery 枚举本机与域内账户（T1087），用于寻找高价值账号或判断环境规模。判据不使用 net.exe，避免与 windows.discovery_command 重复检出。
+    level: low
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_evtx, windows_rdp]
+    enabled_env: RULE_WINDOWS_ACCOUNT_DISCOVERY_ENABLED
+    detection:
+      where:
+        - {field: process_image, op: exists}
+        - {field: command_line, op: exists}
+        - {field: status, op: equals, value: "1"}
+      any:
+        - - field: process_image
+            op: any_endswith
+            values: [wmic.exe]
+          - field: command_line
+            op: any_contains
+            values: [useraccount, groupaccount]
+        - - field: process_image
+            op: any_endswith
+            values: [dsquery.exe]
+          - field: command_line
+            op: regex
+            value: '\b(user|group)\b'
+      aggregate:
+        group_by: [process_image]
+        bucket: true
+    event:
+      type: account_discovery
+      name: 疑似枚举本地或域账户
+      level: low
+      summary: "{asset} 上 {image} 枚举了本机或域内账户（{count} 次），疑似寻找高价值账号，需核实发起进程与后续是否出现针对这些账号的认证尝试。"

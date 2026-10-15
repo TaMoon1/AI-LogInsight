@@ -1,0 +1,180 @@
+# Windows Security / RDP 规则（事件查看器文本导出、二进制 EVTX、XML 导出、键值化导出共用）
+
+source: builtin
+
+# 文档级元数据：本文件内全部规则共用；规则级声明优先（见 rules_engine.build_rule）。
+metadata:
+  author: AI-LogInsight
+  version: "1.0"
+  license: proprietary
+  validation_status: validated
+
+rules:
+  - id: rdp.bruteforce.success
+    title: Windows/RDP 失败认证后成功登录
+    description: 同一来源 IP 在时间窗口内出现大量 Windows 登录失败，随后出现成功登录。
+    level: high
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_rdp, windows_evtx, windows_event]
+    enabled_env: RULE_RDP_BRUTEFORCE_SUCCESS_ENABLED
+    threshold: 10
+    threshold_env: RDP_FAILURE_THRESHOLD
+    window_seconds: 300
+    window_env: RDP_FAILURE_WINDOW_SECONDS
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: action, op: in_set, values: [logon, rdp_logon]}
+        - {field: result, op: equals, value: failure}
+      aggregate:
+        group_by: [source_ip]
+        count_gte: 10
+        window_seconds: 300
+        follow_up:
+          where:
+            - {field: result, op: equals, value: success}
+          within_seconds: 1800
+    suppresses: [rdp.bruteforce]
+    event:
+      type: rdp_bruteforce_success
+      name: Windows/RDP 失败认证后出现成功登录
+      level: high
+      summary: "{ip} 在 5 分钟内出现 {count} 次 Windows 登录失败，{rdp_hint}涉及 {accounts} 个账户，随后出现 {success_count} 次成功登录。"
+      time: follow_up_end
+      evidence: window_follow_up
+      evidence_head: 3
+      follow_up_head: 2
+
+  - id: rdp.bruteforce
+    title: Windows/RDP 认证失败聚集
+    description: 同一来源 IP 在时间窗口内出现大量 Windows 登录失败。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_rdp, windows_evtx, windows_event]
+    enabled_env: RULE_RDP_BRUTEFORCE_ENABLED
+    threshold: 10
+    threshold_env: RDP_FAILURE_THRESHOLD
+    window_seconds: 300
+    window_env: RDP_FAILURE_WINDOW_SECONDS
+    upgrade_rule: rdp.bruteforce.success
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: action, op: in_set, values: [logon, rdp_logon]}
+        - {field: result, op: equals, value: failure}
+      aggregate:
+        group_by: [source_ip]
+        count_gte: 10
+        window_seconds: 300
+        follow_up:
+          where:
+            - {field: result, op: equals, value: success}
+          within_seconds: 1800
+    event:
+      type: rdp_bruteforce
+      name: 疑似 Windows/RDP 认证失败聚集
+      level: medium
+      summary: "{ip} 在 5 分钟内出现 {count} 次 Windows 登录失败，{rdp_hint}涉及 {accounts} 个账户{success_note}"
+      time: follow_up_end
+      evidence: window_follow_up
+      evidence_head: 3
+      follow_up_head: 2
+      notes:
+        success_note:
+          none: "，暂未发现随后成功登录。"
+          downgraded: "，失败后成功登录规则当前已关闭。"
+          found: "，随后出现 {success_count} 次成功登录。"
+
+  - id: windows.privileged_logon
+    title: Windows 高权限账户成功登录
+    description: 检测 administrator 等高权限账户的 Windows 成功登录（含 RDP）。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_rdp, windows_evtx, windows_event]
+    enabled_env: RULE_WINDOWS_PRIVILEGED_LOGON_ENABLED
+    detection:
+      where:
+        - {field: action, op: in_set, values: [logon, rdp_logon]}
+        - {field: result, op: equals, value: success}
+        - {field: username, op: in_set, values: [root, administrator, admin]}
+      aggregate:
+        group_by:
+          - source_ip
+          - target_asset
+          - username
+          - action
+        bucket: true
+    event:
+      type: privileged_login
+      name: 高权限账户成功登录
+      level: medium
+      summary: "日志显示来源 {ip} 成功登录高权限账户 {username}{logon_hint}，共 {count} 次，需核实是否为预期运维行为。"
+      evidence: window_head
+      evidence_head: 10
+
+  - id: windows.account_lockout
+    title: 账户被锁定
+    description: Windows 安全日志记录账户因多次认证失败被锁定（4740），说明该账户正在遭受认证攻击且已造成影响。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_rdp, windows_evtx, windows_event]
+    enabled_env: RULE_WINDOWS_ACCOUNT_LOCKOUT_ENABLED
+    detection:
+      where:
+        - {field: status, op: equals, value: "4740"}
+      aggregate:
+        group_by: [username, target_asset]
+        bucket: true
+    event:
+      type: account_lockout
+      name: 账户因认证失败被锁定
+      level: medium
+      summary: "Windows 安全日志记录账户 {username} 因多次认证失败被锁定（{count} 次），说明存在针对该账户的认证攻击，需确认来源并核实是否需要解除锁定。"
+
+  - id: windows.service_install
+    title: 安装新服务
+    description: Windows 系统日志记录安装了新服务（7045）。自启动服务是常见的持久化手段，也可能是正常软件安装，需结合变更记录核实。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_rdp, windows_evtx, windows_event]
+    enabled_env: RULE_WINDOWS_SERVICE_INSTALL_ENABLED
+    detection:
+      where:
+        - {field: status, op: equals, value: "7045"}
+      aggregate:
+        group_by: [target_asset]
+        bucket: true
+    event:
+      type: service_install
+      name: 安装新服务（持久化候选）
+      level: medium
+      summary: "Windows 系统日志记录在 {asset} 上安装了新服务（{count} 次），需核实是否为预期变更；示例：{sample}"
+
+  - id: windows.protection_service_stopped
+    title: 关键防护服务被停止
+    description: 服务控制管理器记录关键安全防护服务（防病毒、防火墙、安全中心、事件日志、Sysmon 等）被停止（7036 且 State=Stopped）。关闭防护或审计是攻击者惯用的防御规避手段，勒索软件投递前也常先停掉防病毒。若属计划内运维变更则为正常，需结合变更记录确认。
+    level: high
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [windows_rdp, windows_evtx, windows_event]
+    enabled_env: RULE_WINDOWS_PROTECTION_SERVICE_STOPPED_ENABLED
+    detection:
+      where:
+        - {field: status, op: equals, value: "7036"}
+        - {field: service_state, op: equals, value: "stopped"}
+        - field: service_name
+          op: any_contains
+          values: ["windows defender", "microsoft defender", "defender antivirus", "defender firewall", "defender 防火墙", "antimalware", "windows security", "security center", "安全中心", "windows event log", "windows 事件日志", "sysmon", "windows firewall", "windows 防火墙", "endpoint protection", "终结点保护"]
+      aggregate:
+        group_by: [target_asset, service_name]
+        bucket: true
+    event:
+      type: protection_service_stopped
+      name: 关键防护服务被停止（防御规避）
+      level: high
+      summary: "Windows 系统日志记录关键防护服务「{service}」在 {asset} 上被停止（{count} 次）。关闭防护或审计是攻击者常用的防御规避手段，请先确认是否为计划内运维；若非计划内，应立即核查该主机同时段的进程创建、登录与其他服务变更。"

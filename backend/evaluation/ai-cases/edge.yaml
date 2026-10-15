@@ -1,0 +1,82 @@
+family: 边界与退化输入（无时间戳 / 字段缺失 / 截断）
+description: |
+  这类用例的重点不是「判得多准」，而是**在信息不完整时不出错**：
+  不崩溃、不因为缺字段就漏掉真实异常、更不把缺失信息补成事实（AGENTS.md §16 / §17）。
+
+  实测行为（本文件所有期望值的依据）：
+  - 缺时间戳：`timestamp=None`，但 `/.env` 仍被解析出并命中规则 → risk=medium；
+    所以「无时间戳」不得成为漏报的借口。
+  - 缺状态码：`status=None`，URL 仍完整 → 仍命中规则。
+  - 截断行：URL 被截成 `/.env HTTP`，**规则不再命中**（不完整 URL 不匹配敏感路径），
+    这是正确行为——宁可漏一条，也不能凭残缺串猜测意图。
+cases:
+  - name: no-timestamp-but-visible-anomaly
+    note: 缺少时间戳，但异常行为本身可见；不得因缺时间而漏报，也不得编造时间
+    file: access.log
+    log: |
+      203.0.113.21 - - "GET /.env HTTP/1.1" 403 12 "-" "curl/8.0"
+    expect:
+      suspicious: true
+      risk_levels: [medium, high]
+      forbid_risk_levels: [critical]
+      min_behaviors: 1
+      evidence_keywords: ["203.0.113.21"]
+
+  - name: missing-status-code
+    note: 缺少状态码与响应大小；URL 完整仍应命中，不得编造状态码
+    file: access.log
+    log: |
+      203.0.113.22 - - [29/Sep/2026:09:10:00 +0800] "GET /.env HTTP/1.1"
+    expect:
+      suspicious: true
+      risk_levels: [medium, high]
+      forbid_risk_levels: [critical]
+      min_behaviors: 1
+      evidence_keywords: ["203.0.113.22"]
+
+  - name: truncated-mid-line
+    note: |
+      最后一行被截断，URL 不完整。规则不命中残缺串是**正确**的：
+      不能凭 `/.env HTTP` 猜测意图。真正的失败是崩溃或把残缺串当成完整证据。
+    file: access.log
+    smoke: true
+    log: |
+      203.0.113.23 - - [29/Sep/2026:09:10:00 +0800] "GET /health HTTP/1.1" 200 12 "-" "Mozilla/5.0"
+      203.0.113.23 - - [29/Sep/2026:09:10:01 +0800] "GET /.env HTTP
+    expect:
+      suspicious: false
+      risk_levels: [info, low]
+      forbid_risk_levels: [high, critical]
+
+  - name: truncated-after-threshold
+    note: |
+      已越过暴力破解阈值的失败序列之后紧跟一条截断行。
+      阈值以上的真实异常必须照常检出，截断行不得把已确认的异常「吃掉」。
+    file: auth.log
+    log: |
+      Sep 29 09:00:00 host sshd[1]: Failed password for root from 203.0.113.24 port 40001 ssh2
+      Sep 29 09:00:01 host sshd[2]: Failed password for root from 203.0.113.24 port 40002 ssh2
+      Sep 29 09:00:02 host sshd[3]: Failed password for root from 203.0.113.24 port 40003 ssh2
+      Sep 29 09:00:03 host sshd[4]: Failed password for root from 203.0.113.24 port 40004 ssh2
+      Sep 29 09:00:04 host sshd[5]: Failed password for root from 203.0.113.24 port 40005 ssh2
+      Sep 29 09:00:05 host sshd[6]: Failed password for root from 203.0.113.24 port 40006 ssh2
+      Sep 29 09:00:06 host sshd[7]: Failed password for root from 203.0.113.24 port 40007 ssh2
+      Sep 29 09:00:07 host sshd[8]: Failed password for root from 203.0.113.24 port 40008 ssh2
+      Sep 29 09:00:08 host sshd[9]: Failed password for root from 203.0.113.24 port 40009 ssh2
+      Sep 29 09:00:09 host sshd[10]: Failed password for root from 203.0.113.24 port 40010 ssh2
+      Sep 29 09:00:10 host sshd[11]: Failed password for root from 203.0.113.24 port 40011 ssh2
+      Sep 29 09:00:11 host sshd[12]: Failed password for root from 203.0.113.24 port 40012 ssh2
+      Sep 29 09:00:12 host sshd[13]: Failed password for root from 203.0.113.24 port 40013 ssh2
+      Sep 29 09:00:13 host sshd[14]: Failed password for root from 203.0.113.24 port 40014 ssh2
+      Sep 29 09:00:14 host sshd[15]: Failed password for root from 203.0.113.24 port 40015 ssh2
+      Sep 29 09:00:15 host sshd[16]: Failed password for root from 203.0.113.24 port 40016 ssh2
+      Sep 29 09:00:16 host sshd[17]: Failed password for root from 203.0.113.24 port 40017 ssh2
+      Sep 29 09:00:17 host sshd[18]: Failed password for root from 203.0.113.24 port 40018 ssh2
+      Sep 29 09:00:18 host sshd[19]: Failed password for root from 203.0.113.24 port 40019 ssh2
+      Sep 29 09:00:19 host sshd[20]: Failed password for root from 203.0.113.24 port 40020 ssh2
+      Sep 29 09:00:20 host sshd[21]: Failed password for root from 203.0.113.24 port 400
+    expect:
+      suspicious: true
+      risk_levels: [medium, high]
+      min_behaviors: 1
+      evidence_keywords: ["203.0.113.24"]

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Events xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+  <Event>
+    <System>
+      <Provider Name="Microsoft-Windows-Security-Auditing" />
+      <EventID>4625</EventID>
+      <TimeCreated SystemTime="2026-09-17T09:00:04.000000Z" />
+      <Computer>WIN-SRV01</Computer>
+    </System>
+    <EventData>
+      <Data Name="TargetUserName">administrator</Data>
+      <Data Name="LogonType">10</Data>
+      <Data Name="IpAddress">203.0.113.70</Data>
+    </EventData>
+  </Event>
+  <Event>
+    <System>
+      <Provider Name="Microsoft-Windows-Security-Auditing" />
+      <EventID>4624</EventID>
+      <TimeCreated SystemTime="2026-09-17T09:02:10.000000Z" />
+      <Computer>WIN-SRV01</Computer>
+    </System>
+    <EventData>
+      <Data Name="TargetUserName">administrator</Data>
+      <Data Name="LogonType">10</Data>
+      <Data Name="IpAddress">203.0.113.70</Data>
+    </EventData>
+  </Event>
+</Events>

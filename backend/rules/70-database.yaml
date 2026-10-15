@@ -1,0 +1,219 @@
+# 数据库日志研判规则（MySQL / PostgreSQL / MongoDB / Redis）
+#
+# 记录字段约定（parser.py）：
+#   action  = login（认证）/ query（SQL 或命令）/ connect（连接）/ event / error
+#   result  = success / failure（认证结果）
+#   url     = 查询语句 / 命令文本（规则匹配对象）
+#   username = 数据库用户，source_ip = 客户端来源
+
+source: builtin
+
+# 文档级元数据：本文件内全部规则共用；规则级声明优先（见 rules_engine.build_rule）。
+metadata:
+  author: AI-LogInsight
+  version: "1.0"
+  license: proprietary
+  validation_status: validated
+
+rules:
+  - id: db.bruteforce.success
+    title: 数据库认证失败后成功登录
+    description: 同一来源在时间窗口内出现大量数据库认证失败，随后出现成功登录。
+    level: high
+    logsource:
+      log_types: [mysql, postgresql, mongodb, redis, sqlserver, oracle]
+      display_log_types: [mysql, postgresql, mongodb, redis, sqlserver, oracle]
+    enabled_env: RULE_DB_BRUTEFORCE_SUCCESS_ENABLED
+    threshold: 10
+    threshold_env: DB_AUTH_FAILURE_THRESHOLD
+    window_seconds: 300
+    window_env: DB_AUTH_FAILURE_WINDOW_SECONDS
+    detection:
+      where:
+        - {field: action, op: equals, value: login}
+        - {field: result, op: equals, value: failure}
+      aggregate:
+        group_by: [source_ip, username]
+        count_gte: 10
+        window_seconds: 300
+        follow_up:
+          where:
+            - {field: result, op: equals, value: success}
+          within_seconds: 1800
+    suppresses: [db.bruteforce]
+    event:
+      type: db_bruteforce_success
+      name: 数据库认证失败后出现成功登录
+      level: high
+      summary: "{ip} 在 5 分钟内对数据库出现 {count} 次认证失败（账户 {accounts}），随后出现成功登录，疑似口令爆破得手。"
+      time: follow_up_end
+      evidence: window_follow_up
+      evidence_head: 3
+      follow_up_head: 2
+
+  - id: db.bruteforce
+    title: 数据库认证暴力破解候选
+    description: 同一来源在时间窗口内对数据库出现大量认证失败。
+    level: medium
+    logsource:
+      log_types: [mysql, postgresql, mongodb, redis, sqlserver, oracle]
+      display_log_types: [mysql, postgresql, mongodb, redis, sqlserver, oracle]
+    enabled_env: RULE_DB_BRUTEFORCE_ENABLED
+    threshold: 10
+    threshold_env: DB_AUTH_FAILURE_THRESHOLD
+    window_seconds: 300
+    window_env: DB_AUTH_FAILURE_WINDOW_SECONDS
+    upgrade_rule: db.bruteforce.success
+    detection:
+      where:
+        - {field: action, op: equals, value: login}
+        - {field: result, op: equals, value: failure}
+      aggregate:
+        group_by: [source_ip, username]
+        count_gte: 10
+        window_seconds: 300
+        follow_up:
+          where:
+            - {field: result, op: equals, value: success}
+          within_seconds: 1800
+    event:
+      type: db_bruteforce
+      name: 疑似数据库暴力破解
+      level: medium
+      summary: "{ip} 在 5 分钟内对数据库出现 {count} 次认证失败，涉及账户 {accounts}{success_note}"
+      time: follow_up_end
+      evidence: window_follow_up
+      evidence_head: 3
+      follow_up_head: 2
+      notes:
+        success_note:
+          none: "，暂未发现随后成功登录。"
+          downgraded: "，失败后成功登录规则当前已关闭。"
+          found: "，随后出现 {success_count} 次成功登录。"
+
+  - id: db.sql_injection
+    title: 数据库查询注入特征
+    description: 查询语句包含 SQL 注入特征（union 查询、布尔盲注、报错注入、时间盲注、information_schema 探测等）。
+    level: high
+    logsource:
+      log_types: [mysql, postgresql, mongodb]
+      display_log_types: [mysql, postgresql, mongodb]
+    enabled_env: RULE_DB_SQL_INJECTION_ENABLED
+    detection:
+      where:
+        - {field: action, op: equals, value: query}
+        - {field: url, op: exists}
+      any:
+        - - field: url
+            op: any_contains
+            values: ["union select", "union all select", "or 1=1", "or '1'='1", "or \"1\"=\"1", "sleep(", "benchmark(", "information_schema", "pg_sleep(", "waitfor delay", "extractvalue(", "updatexml(", "or true", "-- -", "concat(0x"]
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: db_sql_injection
+      name: 疑似 SQL 注入
+      level: high
+      summary: "数据库查询命中 SQL 注入特征（{count} 次），示例：{sample}"
+
+  - id: db.destructive_query
+    title: 数据库破坏性语句
+    description: 出现 DROP / TRUNCATE / SHUTDOWN 等破坏性语句，或**不带 WHERE 条件**的 DELETE（批量清空表）。带条件的 DELETE 属应用日常流量，不纳入——否则正常的过期数据清理会被刷成 high 级误报。
+    level: high
+    logsource:
+      log_types: [mysql, postgresql, mongodb]
+      display_log_types: [mysql, postgresql, mongodb]
+    enabled_env: RULE_DB_DESTRUCTIVE_QUERY_ENABLED
+    detection:
+      where:
+        - {field: action, op: equals, value: query}
+        - {field: url, op: exists}
+      any:
+        # DDL 与服务级命令：出现即告警
+        - - field: url
+            op: any_contains
+            values: ["drop table", "drop database", "drop index", "truncate table", "truncate ", "drop collection", "db.dropdatabase", "shutdown"]
+        # DELETE 只有「不带 WHERE」才是清空表；带 WHERE 的是正常业务删行
+        - - field: url
+            op: regex
+            value: '\bdelete\s+from\b(?!.*\bwhere\b)'
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: db_destructive_query
+      name: 疑似破坏性数据库操作
+      level: high
+      summary: "出现破坏性数据库语句（{count} 次），示例：{sample}"
+
+  - id: db.privilege_escalation
+    title: 数据库权限变更 / 提权
+    description: 出现 GRANT / CREATE USER / ALTER USER / SET GLOBAL 等权限变更语句。
+    level: high
+    logsource:
+      log_types: [mysql, postgresql, mongodb, redis, sqlserver, oracle]
+      display_log_types: [mysql, postgresql, mongodb, redis, sqlserver, oracle]
+    enabled_env: RULE_DB_PRIVILEGE_ESCALATION_ENABLED
+    detection:
+      where:
+        - {field: url, op: exists}
+      any:
+        - - field: url
+            op: any_contains
+            values: ["grant all", "grant select", "grant update", "create user", "alter user", "set global", "setgid", "db.createuser", "db.grantrolestouser", "create role", "superuser"]
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: db_privilege_escalation
+      name: 疑似数据库权限变更
+      level: high
+      summary: "出现数据库权限变更 / 提权语句（{count} 次），示例：{sample}"
+
+  - id: db.data_exfiltration
+    title: 数据库批量导出 / 数据外传
+    description: 出现 SELECT ... INTO OUTFILE、LOAD_FILE、COPY TO、mysqldump、mongodump、pg_read_file 等批量读取或落盘行为。
+    level: medium
+    logsource:
+      log_types: [mysql, postgresql, mongodb]
+      display_log_types: [mysql, postgresql, mongodb]
+    enabled_env: RULE_DB_DATA_EXFILTRATION_ENABLED
+    detection:
+      where:
+        - {field: action, op: equals, value: query}
+        - {field: url, op: exists}
+      any:
+        - - field: url
+            op: any_contains
+            values: ["into outfile", "load_file(", "pg_read_file", "copy (", "copy to", "mysqldump", "mongodump", "pg_dump"]
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: db_data_exfiltration
+      name: 疑似数据批量导出
+      level: medium
+      summary: "出现批量读取 / 数据外传特征（{count} 次），示例：{sample}"
+
+  - id: db.privileged_login
+    title: 数据库高权限账户登录
+    description: root / postgres / sa / admin / sysadmin 等高权限账户成功登录数据库。
+    level: medium
+    logsource:
+      log_types: [mysql, postgresql, mongodb, redis, sqlserver, oracle]
+      display_log_types: [mysql, postgresql, mongodb, redis, sqlserver, oracle]
+    enabled_env: RULE_DB_PRIVILEGED_LOGIN_ENABLED
+    detection:
+      where:
+        - {field: action, op: equals, value: login}
+        - {field: result, op: equals, value: success}
+        - {field: username, op: in_set, values: [root, postgres, sa, admin, sysadmin, repl, mysql.sys]}
+      aggregate:
+        group_by: [source_ip, username]
+        bucket: true
+    event:
+      type: db_privileged_login
+      name: 数据库高权限账户登录
+      level: medium
+      summary: "来源 {ip} 使用高权限账户 {username} 成功登录数据库（{count} 次），需核实是否为预期运维行为。"
+

@@ -1,0 +1,45 @@
+# 网络设备规则：防火墙 / WAF 键值 syslog
+
+source: builtin
+
+# 文档级元数据：本文件内全部规则共用；规则级声明优先（见 rules_engine.build_rule）。
+metadata:
+  author: AI-LogInsight
+  version: "1.0"
+  license: proprietary
+  validation_status: validated
+
+rules:
+  - id: firewall.port_scan
+    title: 防火墙端口扫描候选
+    description: 同一来源在时间窗口内访问同一目的地址的多个目的端口。
+    level: medium
+    logsource:
+      log_types: [firewall_waf]
+      display_log_types: [firewall_waf]
+    enabled_env: RULE_FIREWALL_PORT_SCAN_ENABLED
+    threshold: 10
+    threshold_env: FIREWALL_PORT_SCAN_THRESHOLD
+    window_seconds: 300
+    window_env: FIREWALL_PORT_SCAN_WINDOW_SECONDS
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: destination_ip, op: exists}
+        - {field: destination_port, op: exists}
+      aggregate:
+        group_by:
+          - source_ip
+          - destination_ip
+          - {field: protocol, default: unknown}
+        distinct_field: destination_port
+        distinct_gte: 10
+        window_seconds: 300
+    event:
+      type: firewall_port_scan_candidate
+      name: 疑似防火墙端口扫描
+      level: medium
+      summary: "{ip} 在 {window} 秒内访问 {destination} 的 {ports} 个 {protocol} 目的端口，可能存在端口探测行为，需结合资产和基线核实。"
+      count: distinct
+      evidence: window_head
+      evidence_head: 10

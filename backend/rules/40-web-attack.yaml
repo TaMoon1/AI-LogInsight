@@ -1,0 +1,197 @@
+# Web 攻击特征规则：按「来源 IP + 规则」聚合，避免同一来源逐条刷屏
+#
+# 所有特征匹配都在双重 URL 解码并转小写后的 URL 上进行；User-Agent 类规则匹配原始日志。
+# 聚合使用 bucket 模式：不做时间窗与阈值，仅按分组汇总为一个事件。
+
+source: builtin
+
+# 文档级元数据：本文件内全部规则共用；规则级声明优先（见 rules_engine.build_rule）。
+metadata:
+  author: AI-LogInsight
+  version: "1.0"
+  license: proprietary
+  validation_status: validated
+
+rules:
+  - id: web.sql_injection
+    title: SQL 注入尝试
+    description: 请求 URL 包含 SQL 注入特征。
+    level: high
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_SQL_INJECTION_ENABLED
+    detection:
+      where:
+        - {field: url, op: exists}
+      any:
+        - - field: url
+            op: any_contains
+            transform: url_decode
+            values: ["' or ", "'or'", "or 1=1", "or '1'='1", "union select", "union all select", "sleep(", "benchmark(", "information_schema", "waitfor delay", "extractvalue(", "updatexml("]
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: sql_injection_attempt
+      name: 疑似 SQL 注入尝试
+      level: high
+      summary: "{ip} 的请求 URL 包含 SQL 注入特征（{count} 次），示例：{sample}"
+
+  - id: web.xss
+    title: XSS 尝试
+    description: 请求 URL 包含跨站脚本特征。
+    level: high
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_XSS_ENABLED
+    detection:
+      where:
+        - {field: url, op: exists}
+      any:
+        - - field: url
+            op: any_contains
+            transform: url_decode
+            values: ["<script", "onerror=", "onload=", "javascript:", "alert(", "<svg", "<iframe"]
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: xss_attempt
+      name: 疑似 XSS 尝试
+      level: high
+      summary: "{ip} 的请求 URL 包含跨站脚本特征（{count} 次），示例：{sample}"
+
+  - id: web.command_injection
+    title: 命令注入尝试
+    description: 请求 URL 包含命令注入特征。
+    level: high
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_COMMAND_INJECTION_ENABLED
+    detection:
+      where:
+        - {field: url, op: exists}
+      any:
+        - - field: url
+            op: any_contains
+            transform: url_decode
+            values: [";whoami", "&&id", "&& id", "|id", "| id", "cmd.exe", ";cat ", "/bin/sh", "$(id)", "$(whoami)", "nc -e"]
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: command_injection_attempt
+      name: 疑似命令注入尝试
+      level: high
+      summary: "{ip} 的请求 URL 包含命令注入特征（{count} 次），示例：{sample}"
+
+  - id: web.cloud_metadata_access
+    title: 云元数据服务访问探测
+    description: 请求 URL 指向云主机元数据服务地址或路径，常见于 SSRF 利用后尝试读取临时凭证。
+    level: high
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_CLOUD_METADATA_ENABLED
+    detection:
+      where:
+        - {field: url, op: exists}
+      any:
+        - - field: url
+            op: any_contains
+            transform: url_decode
+            values: ["169.254.169.254", "metadata.google.internal", "metadata/instance", "latest/meta-data", "latest/user-data"]
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: cloud_metadata_access
+      name: 疑似云元数据服务访问
+      level: high
+      summary: "{ip} 的请求 URL 指向云元数据服务（{count} 次），示例：{sample}，需排查是否存在 SSRF 或代理转发滥用。"
+
+  - id: web.sensitive_interface
+    title: 敏感管理接口探测
+    description: 探测 Spring Boot Actuator、Swagger、phpinfo 等敏感管理接口。不含 `/health`、`/ready` 这类健康检查端点——负载均衡与编排系统会日常高频访问，纳入会产生大量误报。
+    level: medium
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_SENSITIVE_INTERFACE_ENABLED
+    detection:
+      where:
+        - {field: url, op: exists}
+      any:
+        - - field: url
+            op: any_contains
+            transform: url_decode
+            values: ["actuator", "heapdump", "swagger-ui", "api-docs", "phpinfo", "server-status", "server-info", "debug=true", "jolokia", "h2-console", "druid", "/metrics"]
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: sensitive_interface_probe
+      name: 敏感管理接口探测
+      level: medium
+      summary: "{ip} 探测敏感管理接口 {count} 次，示例：{sample}"
+
+  - id: web.webshell
+    title: WebShell 上传或访问
+    description: 出现 WebShell 文件名、可疑函数特征，或可执行脚本上传。
+    level: medium
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_WEBSHELL_ENABLED
+    detection:
+      where:
+        - {field: url, op: exists}
+      any:
+        - - field: url
+            op: any_contains
+            transform: url_decode
+            values: ["shell.php", "shell.jsp", "shell.aspx", "shell.ashx", "webshell", "cmd=", "eval(", "system(", "assert("]
+        - - {field: action, op: in_set, transform: upper, values: [POST, PUT]}
+          - {field: url, op: contains, transform: lower, value: upload}
+          - {field: url, op: any_endswith, transform: lower, values: [".php", ".jsp", ".asp", ".aspx", ".war"]}
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: webshell_probe
+      name: 疑似 WebShell 上传或访问
+      level: medium
+      summary: "{ip} 出现 WebShell 上传或访问特征 {count} 次，示例：{sample}"
+
+  - id: web.scanner_user_agent
+    title: 攻击工具 User-Agent
+    description: 请求使用了 sqlmap、nikto、nmap 等已知攻击工具。
+    level: low
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_SCANNER_USER_AGENT_ENABLED
+    detection:
+      # 匹配原始日志中的工具特征；作用范围限定为「有 URL 的记录」或「Web 类日志」，
+      # 避免命中含 nmap / hydra 等词的 Windows 事件（如进程创建记录）。
+      where:
+        - {field: raw, op: exists}
+        - field: raw
+          op: any_contains
+          transform: lower
+          values: ["sqlmap", "nikto", "nmap", "masscan", "dirbuster", "gobuster", "w3af", "acunetix", "nessus", "hydra", "xray", "awvs", "zgrab"]
+      any:
+        - - {field: url, op: exists}
+        - - {field: log_type, op: in_set, values: [nginx_apache, iis, json, csv]}
+      # 注意：aggregate 必须写在 detection 之下，写在 rule 级会被静默忽略。
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: offensive_tool_user_agent
+      name: 攻击工具 User-Agent
+      level: low
+      summary: "{ip} 的请求使用攻击工具 User-Agent（{count} 次），示例：{sample}"

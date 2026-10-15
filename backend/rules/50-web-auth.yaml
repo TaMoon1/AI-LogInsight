@@ -1,0 +1,94 @@
+# Web 登录接口口令爆破：按「来源 IP + 登录路径」聚合失败响应，并关联其后的 2xx 响应
+
+source: builtin
+
+# 文档级元数据：本文件内全部规则共用；规则级声明优先（见 rules_engine.build_rule）。
+metadata:
+  author: AI-LogInsight
+  version: "1.0"
+  license: proprietary
+  validation_status: validated
+
+rules:
+  - id: web.auth_bruteforce.success
+    title: Web 登录失败聚集后成功响应
+    description: 登录类接口的失败响应聚集后，同一来源在关联窗口内出现 2xx 响应。
+    level: high
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_AUTH_BRUTEFORCE_SUCCESS_ENABLED
+    threshold: 4
+    threshold_env: WEB_AUTH_FAILURE_THRESHOLD
+    window_seconds: 300
+    window_env: WEB_AUTH_FAILURE_WINDOW_SECONDS
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: url, op: exists}
+        - {field: status, op: in_set, values: ["401", "403"]}
+        - {field: url, op: any_contains, transform: url_path, values: [login, signin, sign-in, auth, oauth, token, session]}
+      aggregate:
+        group_by:
+          - source_ip
+          - {field: url, transform: url_path}
+        count_gte: 4
+        window_seconds: 300
+        follow_up:
+          where:
+            - {field: status, op: startswith, value: "2"}
+          within_seconds: 1800
+    suppresses: [web.auth_bruteforce]
+    event:
+      type: web_authentication_failure_success
+      name: Web 登录失败聚集后出现成功响应
+      level: high
+      summary: "{ip} 对 {path} 出现 {count} 次登录失败响应（状态码 {statuses}），随后出现 {success_count} 次 2xx 响应，需确认是口令爆破成功还是正常登录。"
+      time: follow_up_end
+      evidence: window_follow_up
+      evidence_head: 3
+      follow_up_head: 2
+
+  - id: web.auth_bruteforce
+    title: Web 登录失败聚集
+    description: 同一来源在时间窗口内对登录类接口出现多次 401/403 失败响应。
+    level: medium
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_AUTH_BRUTEFORCE_ENABLED
+    threshold: 4
+    threshold_env: WEB_AUTH_FAILURE_THRESHOLD
+    window_seconds: 300
+    window_env: WEB_AUTH_FAILURE_WINDOW_SECONDS
+    upgrade_rule: web.auth_bruteforce.success
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: url, op: exists}
+        - {field: status, op: in_set, values: ["401", "403"]}
+        - {field: url, op: any_contains, transform: url_path, values: [login, signin, sign-in, auth, oauth, token, session]}
+      aggregate:
+        group_by:
+          - source_ip
+          - {field: url, transform: url_path}
+        count_gte: 4
+        window_seconds: 300
+        follow_up:
+          where:
+            - {field: status, op: startswith, value: "2"}
+          within_seconds: 1800
+    event:
+      type: web_authentication_failure_burst
+      name: 疑似 Web 登录失败聚集
+      level: medium
+      summary: "{ip} 对 {path} 出现 {count} 次登录失败响应（状态码 {statuses}）{success_note}"
+      time: follow_up_end
+      evidence: window_follow_up
+      evidence_head: 3
+      follow_up_head: 2
+      notes:
+        success_note:
+          none: "，暂未发现随后的成功响应。"
+          downgraded: "，随后出现 {success_count} 次 2xx 响应，但升级规则当前已关闭。"
+          found: "，随后出现 {success_count} 次 2xx 响应。"

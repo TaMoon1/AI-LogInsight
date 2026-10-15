@@ -1,0 +1,21 @@
+Thu Sep 17 10:00:00 2026
+Errors in file /u01/app/oracle/diag/rdbms/orcl/ORCL/trace/ORCL_ora_1234.trc:
+ORA-01017: invalid username/password; logon denied
+Thu Sep 17 10:00:01 2026
+ORA-01017: invalid username/password; logon denied
+Thu Sep 17 10:00:02 2026
+ORA-01017: invalid username/password; logon denied
+Thu Sep 17 10:00:03 2026
+ORA-01017: invalid username/password; logon denied
+Thu Sep 17 10:00:04 2026
+ORA-01017: invalid username/password; logon denied
+Thu Sep 17 10:00:05 2026
+ORA-01017: invalid username/password; logon denied
+Thu Sep 17 10:00:06 2026
+ORA-01017: invalid username/password; logon denied
+Thu Sep 17 10:00:07 2026
+ORA-01017: invalid username/password; logon denied
+Thu Sep 17 10:00:08 2026
+ORA-01017: invalid username/password; logon denied
+Thu Sep 17 10:00:09 2026
+ORA-01017: invalid username/password; logon denied

@@ -1,0 +1,393 @@
+family: Windows Security / RDP（事件查看器文本导出的精简格式）
+description: |
+  正样本覆盖 rdp.bruteforce、rdp.bruteforce.success、windows.privileged_logon；
+  负样本验证阈值以下不告警、非高权限账户不误报、以及登录类型 3（网络登录）与 10（RDP）的区分。
+cases:
+  - name: rdp-10-failures-then-success
+    note: 10 次 4625 后出现 4624，账户 administrator → 关联升级 + 高权限登录
+    file: Security.log
+    log: |
+      Event ID:      4625
+      Date:          2026-09-12 01:00:00
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.9
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:01
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.9
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:02
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.9
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:03
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.9
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:04
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.9
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:05
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.9
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:06
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.9
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:07
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.9
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:08
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.9
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:09
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.9
+
+      Event ID:      4624
+      Date:          2026-09-12 01:04:00
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.9
+    expect:
+      - rule: rdp.bruteforce.success
+        risk: high
+        count: 10
+        source_ip: 10.0.0.9
+      - rule: windows.privileged_logon
+        risk: medium
+        count: 1
+        source_ip: 10.0.0.9
+    forbid: [rdp.bruteforce]
+
+  - name: rdp-10-failures-only
+    note: 10 次失败、无成功登录，账户非高权限 → 只命中基础规则
+    file: Security.log
+    log: |
+      Event ID:      4625
+      Date:          2026-09-12 01:00:00
+          Account Name:  user1
+          Logon Type:    10
+          Source Network Address: 10.0.0.19
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:01
+          Account Name:  user1
+          Logon Type:    10
+          Source Network Address: 10.0.0.19
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:02
+          Account Name:  user1
+          Logon Type:    10
+          Source Network Address: 10.0.0.19
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:03
+          Account Name:  user1
+          Logon Type:    10
+          Source Network Address: 10.0.0.19
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:04
+          Account Name:  user1
+          Logon Type:    10
+          Source Network Address: 10.0.0.19
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:05
+          Account Name:  user1
+          Logon Type:    10
+          Source Network Address: 10.0.0.19
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:06
+          Account Name:  user1
+          Logon Type:    10
+          Source Network Address: 10.0.0.19
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:07
+          Account Name:  user1
+          Logon Type:    10
+          Source Network Address: 10.0.0.19
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:08
+          Account Name:  user1
+          Logon Type:    10
+          Source Network Address: 10.0.0.19
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:09
+          Account Name:  user1
+          Logon Type:    10
+          Source Network Address: 10.0.0.19
+    expect:
+      - rule: rdp.bruteforce
+        risk: medium
+        count: 10
+        source_ip: 10.0.0.19
+    forbid: [rdp.bruteforce.success, windows.privileged_logon]
+
+  - name: rdp-below-threshold-negative
+    note: 9 次失败（阈值 10）→ 不告警
+    file: Security.log
+    log: |
+      Event ID:      4625
+      Date:          2026-09-12 01:00:00
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.29
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:01
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.29
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:02
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.29
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:03
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.29
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:04
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.29
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:05
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.29
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:06
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.29
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:07
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.29
+
+      Event ID:      4625
+      Date:          2026-09-12 01:00:08
+          Account Name:  administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.29
+    expect: []
+    forbid: []
+
+  - name: windows-privileged-logon-only
+    note: 单条高权限账户成功登录
+    file: Security.log
+    log: |
+      Event ID:      4624
+      Date:          2026-09-12 02:00:00
+          Account Name:  Administrator
+          Logon Type:    10
+          Source Network Address: 10.0.0.39
+    expect:
+      - rule: windows.privileged_logon
+        risk: medium
+        count: 1
+        source_ip: 10.0.0.39
+    forbid: [rdp.bruteforce, rdp.bruteforce.success]
+
+  - name: windows-non-privileged-success-negative
+    note: 普通账户成功登录 → 不告警
+    file: Security.log
+    log: |
+      Event ID:      4624
+      Date:          2026-09-12 02:10:00
+          Account Name:  user2
+          Logon Type:    10
+          Source Network Address: 10.0.0.49
+    expect: []
+    forbid: []
+
+  - name: windows-network-logon-type3
+    note: 登录类型 3（网络登录）同样纳入认证规则，但摘要不应出现 RDP 提示
+    file: Security.log
+    log: |
+      Event ID:      4625
+      Date:          2026-09-12 03:00:00
+          Account Name:  user3
+          Logon Type:    3
+          Source Network Address: 10.0.0.59
+
+      Event ID:      4625
+      Date:          2026-09-12 03:00:01
+          Account Name:  user3
+          Logon Type:    3
+          Source Network Address: 10.0.0.59
+
+      Event ID:      4625
+      Date:          2026-09-12 03:00:02
+          Account Name:  user3
+          Logon Type:    3
+          Source Network Address: 10.0.0.59
+
+      Event ID:      4625
+      Date:          2026-09-12 03:00:03
+          Account Name:  user3
+          Logon Type:    3
+          Source Network Address: 10.0.0.59
+
+      Event ID:      4625
+      Date:          2026-09-12 03:00:04
+          Account Name:  user3
+          Logon Type:    3
+          Source Network Address: 10.0.0.59
+
+      Event ID:      4625
+      Date:          2026-09-12 03:00:05
+          Account Name:  user3
+          Logon Type:    3
+          Source Network Address: 10.0.0.59
+
+      Event ID:      4625
+      Date:          2026-09-12 03:00:06
+          Account Name:  user3
+          Logon Type:    3
+          Source Network Address: 10.0.0.59
+
+      Event ID:      4625
+      Date:          2026-09-12 03:00:07
+          Account Name:  user3
+          Logon Type:    3
+          Source Network Address: 10.0.0.59
+
+      Event ID:      4625
+      Date:          2026-09-12 03:00:08
+          Account Name:  user3
+          Logon Type:    3
+          Source Network Address: 10.0.0.59
+
+      Event ID:      4625
+      Date:          2026-09-12 03:00:09
+          Account Name:  user3
+          Logon Type:    3
+          Source Network Address: 10.0.0.59
+
+      Event ID:      4624
+      Date:          2026-09-12 03:05:00
+          Account Name:  user3
+          Logon Type:    3
+          Source Network Address: 10.0.0.59
+    expect:
+      - rule: rdp.bruteforce.success
+        risk: high
+        count: 10
+        source_ip: 10.0.0.59
+    forbid: [rdp.bruteforce, windows.privileged_logon]
+
+  - name: windows-sigma-denied-rdp-access
+    note: 社区规则「Denied Access To Remote Desktop」（事件 4825）；本项目内置 Windows 规则不覆盖该事件，只由社区规则命中
+    file: Security.log
+    log: |
+      Event ID:      4825
+      Date:          2026-09-12 04:00:00
+          Account Name:  user4
+          Logon Type:    3
+          Source Network Address: 10.0.0.69
+    expect:
+      - rule: sigma.8e5c03fa-b7f0-11ea-b242-07e0576828d9
+        risk: medium
+        count: 1
+        source_ip: 10.0.0.69
+    forbid: [rdp.bruteforce, rdp.bruteforce.success, windows.privileged_logon]
+
+  - name: windows-event-kv-credential-attack-scenario
+    note: |
+      整份 Windows 事件日志（键值化导出）：一条 RDP 凭据攻击链——
+      5 次 4625 登录失败（LogonType=10，来自公网 198.51.100.77）→ 4740 账户被锁定 →
+      锁定后继续尝试（4625 返回 AccountLocked）+ 4648 显式凭据被拒；
+      另有 7045 新服务安装（持久化候选）。少报即漏检，多报即误报。
+    file: windows-event-kv.log
+    log_file: ../scenarios/windows-event-kv.log
+    expect:
+      - rule: windows.privileged_logon
+        risk: medium
+        count: 1
+        source_ip: 192.0.2.50
+      - rule: windows.account_lockout
+        risk: medium
+        count: 1
+      - rule: windows.service_install
+        risk: medium
+        count: 1
+
+  - name: windows-event-kv-normal-negative
+    note: 正常 Windows 事件流（普通账户登录/注销、服务状态、应用事件）→ 零告警
+    file: events.log
+    log: |
+      2026-09-21T08:00:13+08:00 INFO  WIN-SRV-01 Security EventID=4624 LogonType=2 Account="j.chen" SourceAddress="192.0.2.42" AuthenticationPackage="Negotiate" Status="Success"
+      2026-09-21T08:00:17+08:00 INFO  WIN-SRV-01 Security EventID=4634 Account="j.chen" LogonId="0x31A42" Status="Success"
+      2026-09-21T08:00:04+08:00 INFO  WIN-SRV-01 System EventID=7036 Service="Windows Event Log" State="Running"
+      2026-09-21T08:00:28+08:00 INFO  WIN-SRV-01 Application EventID=1000 Process="BackupAgent.exe" PID=4216 Action="ScheduledBackup" Result="Success"
+      2026-09-21T08:01:02+08:00 INFO  WIN-SRV-01 Security EventID=4656 Account="j.chen" Object="D:\Backup" Access="Read" Result="Granted"
+    expect: []
+    forbid: []
+
+  - name: windows-protection-service-stopped-positive
+    note: |
+      防御规避（T1562.001）：攻击者先停掉防病毒服务，再执行后续动作。
+      State=Stopped 是关键判据——同一服务处于 Running 时不告警（见负样本）。
+    file: Security.log
+    log: |
+      2026-09-21T09:10:02+08:00 INFO  WIN-DC-02 Security EventID=7036 Service="Windows Defender Antivirus Service" State="Stopped"
+    expect:
+      - rule: windows.protection_service_stopped
+        risk: high
+        count: 1
+    forbid: []
+
+  - name: windows-protection-service-negative
+    note: |
+      正常服务状态：防护服务处于 Running；非防护服务被停止（Windows Search / Print Spooler /
+      Windows Update 在企业里被停属运维常态）→ 零告警。
+      只有「防护类服务 + Stopped」才算防御规避，避免把日常运维当成攻击。
+    file: System.log
+    log: |
+      2026-09-21T09:00:02+08:00 INFO  WIN-SRV-01 System EventID=7036 Service="Windows Defender Antivirus Service" State="Running"
+      2026-09-21T09:00:05+08:00 INFO  WIN-SRV-01 System EventID=7036 Service="Windows Search" State="Stopped"
+      2026-09-21T09:00:09+08:00 INFO  WIN-SRV-01 System EventID=7036 Service="Print Spooler" State="Stopped"
+      2026-09-21T09:00:12+08:00 INFO  WIN-SRV-01 System EventID=7036 Service="Windows Update" State="Stopped"
+    expect: []
+    forbid: []

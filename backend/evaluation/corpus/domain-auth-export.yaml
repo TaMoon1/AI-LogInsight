@@ -1,0 +1,64 @@
+family: 域控异常登录导出
+description: 安全平台导出的域控异常登录列表，验证 XLSX 解析、标签语义与聚合计数。
+cases:
+  - name: domain-auth-export-suspicious-ip
+    file: domain-auth-export.xlsx
+    log_type: windows_auth_export
+    records:
+      - timestamp: "2026-09-15 00:00:13"
+        timestamp_iso: "2026-09-15T00:00:13"
+        source_ip: 10.0.0.80
+        username: ws-0156$
+        target_asset: 10.0.0.10(DC01)
+        action: auth_anomaly
+        result: null
+        risk_level: 高危
+        login_type: 异常IP
+        service_type: SMB
+        occurrence_count: "25"
+    expect:
+      - rule: windows.auth_export.suspicious_ip
+        risk: high
+        count: 25
+        source_ip: 10.0.0.80
+    forbid: []
+
+  - name: domain-auth-export-abnormal-time
+    file: domain-auth-export.xlsx
+    log_type: windows_auth_export
+    records:
+      - timestamp: "2026-09-15 00:00:13"
+        timestamp_iso: "2026-09-15T00:00:13"
+        source_ip: 10.0.0.11
+        username: dc02$
+        target_asset: 10.0.0.10(DC01)
+        action: auth_anomaly
+        result: null
+        risk_level: 高危
+        login_type: 异常时间
+        service_type: SMB
+        occurrence_count: "3388"
+    expect:
+      - rule: windows.auth_export.abnormal_time
+        risk: medium
+        count: 3388
+        source_ip: 10.0.0.11
+    forbid: []
+
+  - name: domain-auth-export-non-high-negative
+    file: domain-auth-export.xlsx
+    log_type: windows_auth_export
+    records:
+      - timestamp: "2026-09-15 00:00:13"
+        timestamp_iso: "2026-09-15T00:00:13"
+        source_ip: 192.0.2.10
+        username: operator
+        target_asset: 10.0.0.10(DC01)
+        action: auth_anomaly
+        result: null
+        risk_level: 中危
+        login_type: 异常IP
+        service_type: SMB
+        occurrence_count: "100"
+    expect: []
+    forbid: []

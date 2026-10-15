@@ -1,0 +1,325 @@
+family: Web 访问日志（Nginx / Apache / IIS 及结构化 Web 事件）
+description: |
+  正样本覆盖 11 条 Web 规则；负样本验证正常访问流量零告警，以及阈值以下不误报。
+cases:
+  - name: web-sensitive-path
+    note: 单次 /.git/config 探测
+    file: access.log
+    log: |
+      203.0.113.20 - - [12/Sep/2026:01:00:00 +0800] "GET /.git/config HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+    expect:
+      - rule: web.sensitive_path
+        risk: medium
+        count: 1
+        source_ip: 203.0.113.20
+      # 社区规则重叠：SigmaHQ「Source Code Enumeration Detection by Keyword」同样命中 .git/ 探测
+      - rule: sigma.953d460b-f810-420a-97a2-cfca4c98e602
+        risk: medium
+        count: 1
+        source_ip: 203.0.113.20
+    forbid: [web.404_scan, web.path_traversal]
+
+  - name: web-path-traversal
+    note: 目录跳转读取系统文件
+    file: access.log
+    log: |
+      203.0.113.21 - - [12/Sep/2026:01:01:00 +0800] "GET /../../etc/passwd HTTP/1.1" 400 226 "-" "Mozilla/5.0"
+    expect:
+      - rule: web.path_traversal
+        risk: high
+        count: 1
+        source_ip: 203.0.113.21
+    forbid: [web.sensitive_path]
+
+  - name: web-404-scan
+    note: 同源 20 次 404 → 路径枚举候选
+    file: access.log
+    log: |
+      203.0.113.22 - - [12/Sep/2026:02:00:00 +0800] "GET /admin-1.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:01 +0800] "GET /admin-2.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:02 +0800] "GET /admin-3.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:03 +0800] "GET /admin-4.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:04 +0800] "GET /admin-5.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:05 +0800] "GET /admin-6.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:06 +0800] "GET /admin-7.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:07 +0800] "GET /admin-8.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:08 +0800] "GET /admin-9.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:09 +0800] "GET /admin-10.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:10 +0800] "GET /admin-11.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:11 +0800] "GET /admin-12.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:12 +0800] "GET /admin-13.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:13 +0800] "GET /admin-14.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:14 +0800] "GET /admin-15.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:15 +0800] "GET /admin-16.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:16 +0800] "GET /admin-17.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:17 +0800] "GET /admin-18.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:18 +0800] "GET /admin-19.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+      203.0.113.22 - - [12/Sep/2026:02:00:19 +0800] "GET /admin-20.php HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+    expect:
+      - rule: web.404_scan
+        risk: medium
+        count: 20
+        source_ip: 203.0.113.22
+    forbid: [web.sensitive_path, web.5xx_burst]
+
+  - name: web-5xx-burst
+    note: 同源 5 次 5xx → 服务端错误聚集
+    file: access.log
+    log: |
+      203.0.113.23 - - [12/Sep/2026:03:00:00 +0800] "GET /report?page=1 HTTP/1.1" 500 1024 "-" "Mozilla/5.0"
+      203.0.113.23 - - [12/Sep/2026:03:00:01 +0800] "GET /report?page=2 HTTP/1.1" 500 1024 "-" "Mozilla/5.0"
+      203.0.113.23 - - [12/Sep/2026:03:00:02 +0800] "GET /report?page=3 HTTP/1.1" 503 1024 "-" "Mozilla/5.0"
+      203.0.113.23 - - [12/Sep/2026:03:00:03 +0800] "GET /report?page=4 HTTP/1.1" 500 1024 "-" "Mozilla/5.0"
+      203.0.113.23 - - [12/Sep/2026:03:00:04 +0800] "GET /report?page=5 HTTP/1.1" 500 1024 "-" "Mozilla/5.0"
+    expect:
+      - rule: web.5xx_burst
+        risk: medium
+        count: 5
+        source_ip: 203.0.113.23
+    forbid: [web.404_scan]
+
+  - name: web-sql-injection
+    note: 布尔型 SQL 注入特征
+    file: access.log
+    log: |
+      203.0.113.24 - - [12/Sep/2026:04:00:00 +0800] "GET /search?q=1' or '1'='1 HTTP/1.1" 403 512 "-" "curl/8.0"
+    expect:
+      - rule: web.sql_injection
+        risk: high
+        count: 1
+        source_ip: 203.0.113.24
+      # 社区规则重叠：SigmaHQ「SQL Injection Strings In URI」（GET + 关键字，且排除 404）
+      - rule: sigma.5513deaf-f49a-46c2-a6c8-3f111b5cb453
+        risk: high
+        count: 1
+        source_ip: 203.0.113.24
+    forbid: [web.xss, web.command_injection]
+
+  - name: web-xss
+    note: 反射型 XSS 特征
+    file: access.log
+    log: |
+      203.0.113.25 - - [12/Sep/2026:04:01:00 +0800] "GET /comment?text=<script>alert(1)</script> HTTP/1.1" 200 640 "-" "curl/8.0"
+    expect:
+      - rule: web.xss
+        risk: high
+        count: 1
+        source_ip: 203.0.113.25
+      # 社区规则重叠：SigmaHQ「Cross Site Scripting Strings」
+      - rule: sigma.65354b83-a2ea-4ea6-8414-3ab38be0d409
+        risk: high
+        count: 1
+        source_ip: 203.0.113.25
+    forbid: [web.sql_injection, web.command_injection]
+
+  - name: web-command-injection
+    note: 命令注入特征
+    file: access.log
+    log: |
+      203.0.113.26 - - [12/Sep/2026:04:02:00 +0800] "GET /ping?host=127.0.0.1;whoami HTTP/1.1" 200 640 "-" "curl/8.0"
+    expect:
+      - rule: web.command_injection
+        risk: high
+        count: 1
+        source_ip: 203.0.113.26
+    forbid: [web.sql_injection, web.xss]
+
+  - name: web-sensitive-interface
+    note: Spring Boot 管理端点探测
+    file: access.log
+    log: |
+      203.0.113.27 - - [12/Sep/2026:04:03:00 +0800] "GET /actuator/heapdump HTTP/1.1" 404 162 "-" "curl/8.0"
+    expect:
+      - rule: web.sensitive_interface
+        risk: medium
+        count: 1
+        source_ip: 203.0.113.27
+    forbid: [web.webshell]
+
+  - name: web-webshell-upload
+    note: 可执行脚本上传
+    file: access.log
+    log: |
+      203.0.113.28 - - [12/Sep/2026:04:04:00 +0800] "POST /upload/shell.php HTTP/1.1" 200 32 "-" "curl/8.0"
+    expect:
+      - rule: web.webshell
+        risk: medium
+        count: 1
+        source_ip: 203.0.113.28
+    forbid: [web.sensitive_interface]
+
+  - name: web-scanner-user-agent
+    note: 攻击工具 User-Agent
+    file: access.log
+    log: |
+      203.0.113.29 - - [12/Sep/2026:04:05:00 +0800] "GET /product?id=1 HTTP/1.1" 200 2048 "-" "sqlmap/1.7#stable (http://sqlmap.org)"
+    expect:
+      - rule: web.scanner_user_agent
+        risk: low
+        count: 1
+        source_ip: 203.0.113.29
+      # 社区规则重叠：SigmaHQ「Suspicious User-Agents Related To Recon Tools」
+      # 社区规则把该类 User-Agent 定为 medium，本项目内置规则定为 low，两者独立保留
+      - rule: sigma.19aa4f58-94ca-45ff-bc34-92e533c0994a
+        risk: medium
+        count: 1
+        source_ip: 203.0.113.29
+    forbid: [web.sql_injection]
+
+  - name: web-auth-bruteforce-only
+    note: 登录接口 4 次 401 且无成功响应
+    file: access.log
+    log: |
+      203.0.113.30 - - [12/Sep/2026:05:00:00 +0800] "POST /api/login HTTP/1.1" 401 742 "-" "python-requests/2.32.5"
+      203.0.113.30 - - [12/Sep/2026:05:00:01 +0800] "POST /api/login HTTP/1.1" 401 742 "-" "python-requests/2.32.5"
+      203.0.113.30 - - [12/Sep/2026:05:00:02 +0800] "POST /api/login HTTP/1.1" 401 742 "-" "python-requests/2.32.5"
+      203.0.113.30 - - [12/Sep/2026:05:00:03 +0800] "POST /api/login HTTP/1.1" 403 742 "-" "python-requests/2.32.5"
+    expect:
+      - rule: web.auth_bruteforce
+        risk: medium
+        count: 4
+        source_ip: 203.0.113.30
+    forbid: [web.auth_bruteforce.success]
+
+  - name: web-auth-bruteforce-success
+    note: 401 聚集后出现 2xx → 升级为 high
+    file: access.log
+    log: |
+      203.0.113.31 - - [12/Sep/2026:05:10:00 +0800] "POST /api/login HTTP/1.1" 401 742 "-" "python-requests/2.32.5"
+      203.0.113.31 - - [12/Sep/2026:05:10:01 +0800] "POST /api/login HTTP/1.1" 401 742 "-" "python-requests/2.32.5"
+      203.0.113.31 - - [12/Sep/2026:05:10:02 +0800] "POST /api/login HTTP/1.1" 401 742 "-" "python-requests/2.32.5"
+      203.0.113.31 - - [12/Sep/2026:05:10:03 +0800] "POST /api/login HTTP/1.1" 401 742 "-" "python-requests/2.32.5"
+      203.0.113.31 - - [12/Sep/2026:05:12:00 +0800] "POST /api/login HTTP/1.1" 200 1832 "-" "python-requests/2.32.5"
+    expect:
+      - rule: web.auth_bruteforce.success
+        risk: high
+        count: 4
+        source_ip: 203.0.113.31
+    forbid: [web.auth_bruteforce]
+
+  - name: web-login-failures-below-threshold-negative
+    note: 3 次 401（阈值 4）→ 不告警
+    file: access.log
+    log: |
+      203.0.113.32 - - [12/Sep/2026:05:20:00 +0800] "POST /api/login HTTP/1.1" 401 742 "-" "python-requests/2.32.5"
+      203.0.113.32 - - [12/Sep/2026:05:20:01 +0800] "POST /api/login HTTP/1.1" 401 742 "-" "python-requests/2.32.5"
+      203.0.113.32 - - [12/Sep/2026:05:20:02 +0800] "POST /api/login HTTP/1.1" 401 742 "-" "python-requests/2.32.5"
+    expect: []
+    forbid: []
+
+  - name: web-normal-traffic-negative
+    note: 正常访问流量 → 零告警
+    file: access.log
+    log: |
+      203.0.113.40 - - [12/Sep/2026:06:00:00 +0800] "GET /index.html HTTP/1.1" 200 5120 "-" "Mozilla/5.0"
+      203.0.113.40 - - [12/Sep/2026:06:00:01 +0800] "GET /static/app.js HTTP/1.1" 200 20480 "-" "Mozilla/5.0"
+      203.0.113.40 - - [12/Sep/2026:06:00:02 +0800] "GET /api/profile HTTP/1.1" 200 320 "-" "Mozilla/5.0"
+    expect: []
+    forbid: []
+
+  - name: web-sigma-path-traversal
+    note: 社区规则「Path Traversal Exploitation Attempts」；内置遍历规则同样命中，属于纵深检测
+    file: access.log
+    log: |
+      203.0.113.33 - - [12/Sep/2026:06:10:00 +0800] "GET /download?file=../../../../../etc/passwd HTTP/1.1" 400 226 "-" "Mozilla/5.0"
+    expect:
+      - rule: web.path_traversal
+        risk: high
+        count: 1
+        source_ip: 203.0.113.33
+      - rule: sigma.7745c2ea-24a5-4290-b680-04359cb84b35
+        risk: medium
+        count: 1
+        source_ip: 203.0.113.33
+    forbid: [web.sql_injection, web.xss]
+
+  - name: web-sigma-java-payload
+    note: 社区规则「Java Payload Strings」（Confluence/Struts 等 Java 组件利用特征）
+    file: access.log
+    log: |
+      203.0.113.34 - - [12/Sep/2026:06:20:00 +0800] "GET /pages/doenterpageaction.action?redirect=%24%7B%28%23a%3D%40java.lang.Runtime%40getRuntime%28%29.exec%28%27id%27%29%7D HTTP/1.1" 200 512 "-" "Mozilla/5.0"
+    expect:
+      - rule: sigma.583aa0a2-30b1-4d62-8bf3-ab73689efe6c
+        risk: high
+        count: 1
+        source_ip: 203.0.113.34
+    forbid: [web.command_injection, web.sql_injection, web.xss]
+
+  - name: web-sensitive-file-read-success
+    note: 直接请求 SSH 私钥并返回 200 → 升级为「敏感文件成功读取」，不输出基础探测规则
+    file: access.log
+    log: |
+      203.0.113.50 - - [12/Sep/2026:07:00:00 +0800] "GET /.ssh/id_rsa HTTP/1.1" 200 1678 "-" "Mozilla/5.0"
+    expect:
+      - rule: web.sensitive_file_access.success
+        risk: high
+        count: 1
+        source_ip: 203.0.113.50
+    forbid: [web.sensitive_file_access, web.path_traversal, web.sensitive_path]
+
+  - name: web-sensitive-file-probe-denied
+    note: 请求备份文件被拒绝（404）→ 仅输出基础探测规则
+    file: access.log
+    log: |
+      203.0.113.51 - - [12/Sep/2026:07:05:00 +0800] "GET /backup.sql HTTP/1.1" 404 162 "-" "Mozilla/5.0"
+    expect:
+      - rule: web.sensitive_file_access
+        risk: medium
+        count: 1
+        source_ip: 203.0.113.51
+    forbid: [web.sensitive_file_access.success, web.path_traversal, web.sensitive_path]
+
+  - name: web-metrics-endpoint-probe
+    note: 探测 Prometheus 指标接口（403）→ 敏感管理接口探测
+    file: access.log
+    log: |
+      203.0.113.52 - - [12/Sep/2026:07:10:00 +0800] "GET /metrics HTTP/1.1" 403 350 "-" "curl/8.0"
+    expect:
+      - rule: web.sensitive_interface
+        risk: medium
+        count: 1
+        source_ip: 203.0.113.52
+    forbid: [web.sensitive_file_access, web.404_scan]
+
+  - name: web-ipv6-client-path-traversal
+    note: IPv6 来源（::1）的请求同样可解析并命中路径遍历
+    file: access.log
+    log: |
+      ::1 - - [12/Sep/2026:07:20:00 +0800] "GET /download?file=../../../../stuff/app.ini HTTP/1.1" 404 226 "-" "Mozilla/5.0"
+    expect:
+      - rule: web.path_traversal
+        risk: high
+        count: 1
+        source_ip: ::1
+    forbid: [web.sensitive_file_access, web.sensitive_file_access.success]
+
+  - name: web-health-check-negative
+    note: 负载均衡 / 编排系统的健康检查（/health、/ready）属日常探针，不能当成敏感接口探测
+    file: access.log
+    log: |
+      198.51.100.10 - - [12/Sep/2026:08:00:00 +0800] "GET /health HTTP/1.1" 200 15 "-" "kube-probe/1.29"
+      198.51.100.10 - - [12/Sep/2026:08:00:15 +0800] "GET /health HTTP/1.1" 200 15 "-" "kube-probe/1.29"
+      198.51.100.10 - - [12/Sep/2026:08:00:30 +0800] "GET /ready HTTP/1.1" 200 15 "-" "kube-probe/1.29"
+      198.51.100.11 - - [12/Sep/2026:08:00:31 +0800] "GET /health HTTP/1.1" 200 15 "-" "ELB-HealthChecker/2.0"
+    expect: []
+    forbid: []
+
+  - name: web-cloud-metadata-probe
+    note: 请求云元数据地址 → 疑似 SSRF 后读取临时凭证
+    file: access.log
+    log: |
+      203.0.113.70 - - [12/Sep/2026:08:10:00 +0800] "GET /fetch?url=http%3A%2F%2F169.254.169.254%2Flatest%2Fmeta-data%2Fiam%2Fsecurity-credentials%2F HTTP/1.1" 200 512 "-" "Mozilla/5.0"
+    expect:
+      - rule: web.cloud_metadata_access
+        risk: high
+        count: 1
+        source_ip: 203.0.113.70
+    forbid: [web.sensitive_interface, web.path_traversal]
+
+  - name: web-normal-metadata-page-negative
+    note: 正常业务文档路径包含 metadata 字样，但不指向云元数据服务
+    file: access.log
+    log: |
+      203.0.113.71 - - [12/Sep/2026:08:15:00 +0800] "GET /docs/metadata-guide HTTP/1.1" 200 4096 "-" "Mozilla/5.0"
+    expect: []
+    forbid: [web.cloud_metadata_access, web.sensitive_interface]

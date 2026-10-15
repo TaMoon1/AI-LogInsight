@@ -1,0 +1,729 @@
+{
+  "source": "EVTX-to-MITRE-Attack（外部参考集，本仓库只取其技术清单作标尺）",
+  "source_url": "https://github.com/mdecrevoisier/EVTX-to-MITRE-Attack",
+  "reference_sample_count": 270,
+  "reference_packaged": false,
+  "scope_note": "270 是外部参考集的样本规模（>270，第三方 EVTX 样本），**未打包进本仓库**，也不会被本产品解析；这里只引用其中出现过的 27 项技术作为覆盖标尺。这 27 项是「优先清单」而不是 ATT&CK 全量（Enterprise 有 200+ 技术），所以覆盖率读作「这份清单里的覆盖情况」，不等于覆盖了所有攻击手法。清单中的每项技术都标了 `origin`：`external` = 外部参考集原有，`project` = 本项目为补齐空白战术自行补充（这些技术**不在**外部参考集内，不构成外部基准）；报告按两个来源分开统计，不合并成一个百分比。\n\n**2026-10-13 扩充**：导入 SigmaHQ 全量 Windows 规则（2417 候选 → 1608 条保留）后，按「该技术有 ≥5 条规则支撑」把 **75 项技术**加入清单（全部标 `origin: project`）；技术名与战术取自 MITRE ATT&CK 官方数据（`kill_chain_phases`），不是从规则标签投票推的——标签投票给 T1685 的战术是「执行」，官方是「防御规避」，两者不一致时以官方为准。清单现为 **120 项**（外部参考集原有 27 + 本项目补充 93）。⚠️ 新加入的技术**没有本地正样本**验证，覆盖报告里会显示「有规则、无样本」，不代表已在本项目语料上验证过。",
+  "techniques": [
+    {
+      "id": "T1021.001",
+      "name": "Remote Services: RDP",
+      "tactic": "横向移动",
+      "origin": "external"
+    },
+    {
+      "id": "T1021.004",
+      "name": "Remote Services: SSH",
+      "tactic": "横向移动",
+      "origin": "external"
+    },
+    {
+      "id": "T1036.008",
+      "name": "Masquerading: Masquerade File Type",
+      "tactic": "防御规避",
+      "origin": "external"
+    },
+    {
+      "id": "T1041",
+      "name": "Exfiltration Over C2 Channel",
+      "tactic": "数据渗出",
+      "origin": "external"
+    },
+    {
+      "id": "T1046",
+      "name": "Network Service Scanning",
+      "tactic": "发现",
+      "origin": "external"
+    },
+    {
+      "id": "T1057",
+      "name": "Process Discovery",
+      "tactic": "发现",
+      "origin": "external"
+    },
+    {
+      "id": "T1059",
+      "name": "Command and Scripting Interpreter",
+      "tactic": "执行",
+      "origin": "external"
+    },
+    {
+      "id": "T1059.001",
+      "name": "PowerShell",
+      "tactic": "执行",
+      "origin": "external"
+    },
+    {
+      "id": "T1059.003",
+      "name": "Windows Command Shell",
+      "tactic": "执行",
+      "origin": "external"
+    },
+    {
+      "id": "T1068",
+      "name": "Exploitation for Privilege Escalation",
+      "tactic": "权限提升",
+      "origin": "external"
+    },
+    {
+      "id": "T1070.004",
+      "name": "Indicator Removal: File Deletion",
+      "tactic": "防御规避",
+      "origin": "external"
+    },
+    {
+      "id": "T1071.004",
+      "name": "Application Layer Protocol: DNS",
+      "tactic": "命令与控制",
+      "origin": "external"
+    },
+    {
+      "id": "T1078",
+      "name": "Valid Accounts",
+      "tactic": "防御规避",
+      "origin": "external"
+    },
+    {
+      "id": "T1082",
+      "name": "System Information Discovery",
+      "tactic": "发现",
+      "origin": "external"
+    },
+    {
+      "id": "T1105",
+      "name": "Ingress Tool Transfer",
+      "tactic": "命令与控制",
+      "origin": "external"
+    },
+    {
+      "id": "T1110",
+      "name": "Brute Force",
+      "tactic": "凭据访问",
+      "origin": "external"
+    },
+    {
+      "id": "T1110.001",
+      "name": "Brute Force: Password Guessing",
+      "tactic": "凭据访问",
+      "origin": "external"
+    },
+    {
+      "id": "T1112",
+      "name": "Modify Registry",
+      "tactic": "防御规避",
+      "origin": "external"
+    },
+    {
+      "id": "T1190",
+      "name": "Exploit Public-Facing Application",
+      "tactic": "初始访问",
+      "origin": "external"
+    },
+    {
+      "id": "T1218",
+      "name": "System Binary Proxy Execution",
+      "tactic": "防御规避",
+      "origin": "external"
+    },
+    {
+      "id": "T1505.003",
+      "name": "Server Software Component: Web Shell",
+      "tactic": "持久化",
+      "origin": "external"
+    },
+    {
+      "id": "T1543.003",
+      "name": "Create or Modify System Process: Windows Service",
+      "tactic": "持久化",
+      "origin": "external"
+    },
+    {
+      "id": "T1552.004",
+      "name": "Unsecured Credentials: Private Keys",
+      "tactic": "凭据访问",
+      "origin": "external"
+    },
+    {
+      "id": "T1553.004",
+      "name": "Subvert Trust Controls: Install Root Certificate",
+      "tactic": "防御规避",
+      "origin": "external"
+    },
+    {
+      "id": "T1555",
+      "name": "Credentials from Password Stores",
+      "tactic": "凭据访问",
+      "origin": "external"
+    },
+    {
+      "id": "T1560.001",
+      "name": "Archive Collected Data: Archive via Utility",
+      "tactic": "收集",
+      "origin": "external"
+    },
+    {
+      "id": "T1562.001",
+      "name": "Impair Defenses: Disable or Modify Tools",
+      "tactic": "防御规避",
+      "origin": "external"
+    },
+    {
+      "id": "T1003.001",
+      "name": "OS Credential Dumping: LSASS Memory",
+      "tactic": "凭据访问",
+      "origin": "project"
+    },
+    {
+      "id": "T1003.002",
+      "name": "OS Credential Dumping: Security Account Manager",
+      "tactic": "凭据访问",
+      "origin": "project"
+    },
+    {
+      "id": "T1003.003",
+      "name": "OS Credential Dumping: NTDS",
+      "tactic": "凭据访问",
+      "origin": "project"
+    },
+    {
+      "id": "T1049",
+      "name": "System Network Connections Discovery",
+      "tactic": "发现",
+      "origin": "project"
+    },
+    {
+      "id": "T1070.001",
+      "name": "Indicator Removal: Clear Windows Event Logs",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1083",
+      "name": "File and Directory Discovery",
+      "tactic": "发现",
+      "origin": "project"
+    },
+    {
+      "id": "T1087",
+      "name": "Account Discovery",
+      "tactic": "发现",
+      "origin": "project"
+    },
+    {
+      "id": "T1098",
+      "name": "Account Manipulation",
+      "tactic": "持久化",
+      "origin": "project"
+    },
+    {
+      "id": "T1136.001",
+      "name": "Create Account: Local Account",
+      "tactic": "持久化",
+      "origin": "project"
+    },
+    {
+      "id": "T1140",
+      "name": "Deobfuscate/Decode Files or Information",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1485",
+      "name": "Data Destruction",
+      "tactic": "影响",
+      "origin": "project"
+    },
+    {
+      "id": "T1486",
+      "name": "Data Encrypted for Impact",
+      "tactic": "影响",
+      "origin": "project"
+    },
+    {
+      "id": "T1489",
+      "name": "Service Stop",
+      "tactic": "影响",
+      "origin": "project"
+    },
+    {
+      "id": "T1490",
+      "name": "Inhibit System Recovery",
+      "tactic": "影响",
+      "origin": "project"
+    },
+    {
+      "id": "T1547.001",
+      "name": "Boot or Logon Autostart Execution: Registry Run Keys / Startup Folder",
+      "tactic": "持久化",
+      "origin": "project"
+    },
+    {
+      "id": "T1548.002",
+      "name": "Abuse Elevation Control Mechanism: Bypass User Account Control",
+      "tactic": "权限提升",
+      "origin": "project"
+    },
+    {
+      "id": "T1552.001",
+      "name": "Unsecured Credentials: Credentials In Files",
+      "tactic": "凭据访问",
+      "origin": "project"
+    },
+    {
+      "id": "T1564.001",
+      "name": "Hide Artifacts: Hidden Files and Directories",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1685",
+      "name": "Disable or Modify Tools",
+      "tactic": "其他",
+      "origin": "project"
+    },
+    {
+      "id": "T1027",
+      "name": "Obfuscated Files or Information",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1047",
+      "name": "Windows Management Instrumentation",
+      "tactic": "执行",
+      "origin": "project"
+    },
+    {
+      "id": "T1202",
+      "name": "Indirect Command Execution",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1569.002",
+      "name": "Service Execution",
+      "tactic": "执行",
+      "origin": "project"
+    },
+    {
+      "id": "T1036",
+      "name": "Masquerading",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1219.002",
+      "name": "Remote Desktop Software",
+      "tactic": "命令与控制",
+      "origin": "project"
+    },
+    {
+      "id": "T1053.005",
+      "name": "Scheduled Task",
+      "tactic": "执行",
+      "origin": "project"
+    },
+    {
+      "id": "T1218.011",
+      "name": "Rundll32",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1574.001",
+      "name": "DLL",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1021.002",
+      "name": "SMB/Windows Admin Shares",
+      "tactic": "横向移动",
+      "origin": "project"
+    },
+    {
+      "id": "T1572",
+      "name": "Protocol Tunneling",
+      "tactic": "命令与控制",
+      "origin": "project"
+    },
+    {
+      "id": "T1127",
+      "name": "Trusted Developer Utilities Proxy Execution",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1036.003",
+      "name": "Rename Legitimate Utilities",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1685.001",
+      "name": "Disable or Modify Windows Event Log",
+      "tactic": "其他",
+      "origin": "project"
+    },
+    {
+      "id": "T1059.005",
+      "name": "Visual Basic",
+      "tactic": "执行",
+      "origin": "project"
+    },
+    {
+      "id": "T1003",
+      "name": "OS Credential Dumping",
+      "tactic": "凭据访问",
+      "origin": "project"
+    },
+    {
+      "id": "T1218.010",
+      "name": "Regsvr32",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1566.001",
+      "name": "Spearphishing Attachment",
+      "tactic": "初始访问",
+      "origin": "project"
+    },
+    {
+      "id": "T1059.007",
+      "name": "JavaScript",
+      "tactic": "执行",
+      "origin": "project"
+    },
+    {
+      "id": "T1055",
+      "name": "Process Injection",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1216",
+      "name": "System Script Proxy Execution",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1033",
+      "name": "System Owner/User Discovery",
+      "tactic": "发现",
+      "origin": "project"
+    },
+    {
+      "id": "T1090",
+      "name": "Proxy",
+      "tactic": "命令与控制",
+      "origin": "project"
+    },
+    {
+      "id": "T1482",
+      "name": "Domain Trust Discovery",
+      "tactic": "发现",
+      "origin": "project"
+    },
+    {
+      "id": "T1036.005",
+      "name": "Match Legitimate Resource Name or Location",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1204.002",
+      "name": "Malicious File",
+      "tactic": "执行",
+      "origin": "project"
+    },
+    {
+      "id": "T1564.004",
+      "name": "NTFS File Attributes",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1018",
+      "name": "Remote System Discovery",
+      "tactic": "发现",
+      "origin": "project"
+    },
+    {
+      "id": "T1087.002",
+      "name": "Domain Account",
+      "tactic": "发现",
+      "origin": "project"
+    },
+    {
+      "id": "T1567.002",
+      "name": "Exfiltration to Cloud Storage",
+      "tactic": "数据渗出",
+      "origin": "project"
+    },
+    {
+      "id": "T1102",
+      "name": "Web Service",
+      "tactic": "命令与控制",
+      "origin": "project"
+    },
+    {
+      "id": "T1203",
+      "name": "Exploitation for Client Execution",
+      "tactic": "执行",
+      "origin": "project"
+    },
+    {
+      "id": "T1021.003",
+      "name": "Distributed Component Object Model",
+      "tactic": "横向移动",
+      "origin": "project"
+    },
+    {
+      "id": "T1071.001",
+      "name": "Web Protocols",
+      "tactic": "命令与控制",
+      "origin": "project"
+    },
+    {
+      "id": "T1137",
+      "name": "Office Application Startup",
+      "tactic": "持久化",
+      "origin": "project"
+    },
+    {
+      "id": "T1567",
+      "name": "Exfiltration Over Web Service",
+      "tactic": "数据渗出",
+      "origin": "project"
+    },
+    {
+      "id": "T1686.003",
+      "name": "Windows Host Firewall",
+      "tactic": "其他",
+      "origin": "project"
+    },
+    {
+      "id": "T1027.010",
+      "name": "Command Obfuscation",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1012",
+      "name": "Query Registry",
+      "tactic": "发现",
+      "origin": "project"
+    },
+    {
+      "id": "T1003.004",
+      "name": "LSA Secrets",
+      "tactic": "凭据访问",
+      "origin": "project"
+    },
+    {
+      "id": "T1574.011",
+      "name": "Services Registry Permissions Weakness",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1048",
+      "name": "Exfiltration Over Alternative Protocol",
+      "tactic": "数据渗出",
+      "origin": "project"
+    },
+    {
+      "id": "T1558.003",
+      "name": "Kerberoasting",
+      "tactic": "凭据访问",
+      "origin": "project"
+    },
+    {
+      "id": "T1546",
+      "name": "Event Triggered Execution",
+      "tactic": "权限提升",
+      "origin": "project"
+    },
+    {
+      "id": "T1546.015",
+      "name": "Component Object Model Hijacking",
+      "tactic": "权限提升",
+      "origin": "project"
+    },
+    {
+      "id": "T1016",
+      "name": "System Network Configuration Discovery",
+      "tactic": "发现",
+      "origin": "project"
+    },
+    {
+      "id": "T1210",
+      "name": "Exploitation of Remote Services",
+      "tactic": "横向移动",
+      "origin": "project"
+    },
+    {
+      "id": "T1134.001",
+      "name": "Token Impersonation/Theft",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1133",
+      "name": "External Remote Services",
+      "tactic": "持久化",
+      "origin": "project"
+    },
+    {
+      "id": "T1069.002",
+      "name": "Domain Groups",
+      "tactic": "发现",
+      "origin": "project"
+    },
+    {
+      "id": "T1219",
+      "name": "Remote Access Tools",
+      "tactic": "命令与控制",
+      "origin": "project"
+    },
+    {
+      "id": "T1070",
+      "name": "Indicator Removal",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1197",
+      "name": "BITS Jobs",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1564.003",
+      "name": "Hidden Window",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1546.008",
+      "name": "Accessibility Features",
+      "tactic": "权限提升",
+      "origin": "project"
+    },
+    {
+      "id": "T1218.005",
+      "name": "Mshta",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1588.002",
+      "name": "Tool",
+      "tactic": "其他",
+      "origin": "project"
+    },
+    {
+      "id": "T1218.008",
+      "name": "Odbcconf",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1546.011",
+      "name": "Application Shimming",
+      "tactic": "权限提升",
+      "origin": "project"
+    },
+    {
+      "id": "T1204.004",
+      "name": "Malicious Copy and Paste",
+      "tactic": "执行",
+      "origin": "project"
+    },
+    {
+      "id": "T1003.005",
+      "name": "Cached Domain Credentials",
+      "tactic": "凭据访问",
+      "origin": "project"
+    },
+    {
+      "id": "T1134.002",
+      "name": "Create Process with Token",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1040",
+      "name": "Network Sniffing",
+      "tactic": "凭据访问",
+      "origin": "project"
+    },
+    {
+      "id": "T1546.003",
+      "name": "Windows Management Instrumentation Event Subscription",
+      "tactic": "权限提升",
+      "origin": "project"
+    },
+    {
+      "id": "T1557.001",
+      "name": "Name Resolution Poisoning and SMB Relay",
+      "tactic": "凭据访问",
+      "origin": "project"
+    },
+    {
+      "id": "T1027.004",
+      "name": "Compile After Delivery",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1566",
+      "name": "Phishing",
+      "tactic": "初始访问",
+      "origin": "project"
+    },
+    {
+      "id": "T1574",
+      "name": "Hijack Execution Flow",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1547",
+      "name": "Boot or Logon Autostart Execution",
+      "tactic": "持久化",
+      "origin": "project"
+    },
+    {
+      "id": "T1564",
+      "name": "Hide Artifacts",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1106",
+      "name": "Native API",
+      "tactic": "执行",
+      "origin": "project"
+    },
+    {
+      "id": "T1546.001",
+      "name": "Change Default File Association",
+      "tactic": "权限提升",
+      "origin": "project"
+    },
+    {
+      "id": "T1055.001",
+      "name": "Dynamic-link Library Injection",
+      "tactic": "防御规避",
+      "origin": "project"
+    },
+    {
+      "id": "T1218.001",
+      "name": "Compiled HTML File",
+      "tactic": "防御规避",
+      "origin": "project"
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+family: 攻击链场景（整份真实样本日志，回归基线）
+description: |
+  与逐条规则的单元用例不同，这里用**整份真实日志**断言完整的可疑行为清单：
+  期望事件集合必须逐一命中，且不允许出现未预期事件。
+  链上任何一个环节漏检（例如新增了行为却没人写规则）都会让门禁变红。
+  日志固件位于 `backend/evaluation/scenarios/`。
+cases:
+  - name: scenario-sysmon-intrusion-chain
+    note: |
+      Windows Sysmon 入侵链：落地文件写入 → 系统工具下载载荷 → 伪扩展名执行 → 落地程序外联 →
+      批量写注册表 → 证书策略注册表写入 → 浏览器凭据清理 → 落地程序自删 →
+      随机域名解析 → 主机发现命令 → 密码打包。
+      任一条规则失效或少报即视为漏检。
+    file: sysmon-intrusion-chain.log
+    log_file: ../scenarios/sysmon-intrusion-chain.log
+    expect:
+      - rule: windows.lolbin_download
+        risk: high
+        count: 1
+      - rule: windows.masquerade_extension
+        risk: high
+        count: 1
+      - rule: windows.credential_file_access
+        risk: high
+        count: 1
+      - rule: windows.payload_outbound_connection
+        risk: high
+        count: 4
+      - rule: windows.suspicious_executable_in_temp
+        risk: medium
+        count: 1
+      - rule: windows.archive_with_password
+        risk: medium
+        count: 1
+      - rule: windows.payload_cleanup
+        risk: medium
+        count: 1
+      - rule: windows.registry_certificate_store
+        risk: medium
+        count: 4
+      - rule: windows.suspicious_dns_query
+        risk: medium
+        count: 1
+      - rule: windows.discovery_command
+        risk: low
+        count: 6
+      - rule: windows.registry_bulk_write
+        risk: low
+        count: 16
+    forbid: []
+
+  - name: scenario-nginx-sensitive-file-probe
+    note: |
+      Nginx 访问日志：路径遍历读取 SSH 私钥并返回 200（成功读取）、
+      探测 Prometheus 指标接口；正常访问流量不得触发任何规则。
+    file: nginx-sensitive-file-probe.log
+    log_file: ../scenarios/nginx-sensitive-file-probe.log
+    expect:
+      - rule: web.path_traversal
+        risk: high
+        count: 1
+      - rule: web.sensitive_file_access.success
+        risk: high
+        count: 1
+      - rule: web.sensitive_interface
+        risk: medium
+        count: 1
+    forbid: []

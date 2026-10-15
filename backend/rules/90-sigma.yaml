@@ -1,0 +1,463 @@
+# 由 backend/scripts/import_sigma.py 生成的 Sigma 导入规则，请勿手工编辑。
+# 重新导入：cd backend && .venv\Scripts\python.exe scripts\import_sigma.py --write
+
+metadata:
+  author: SigmaHQ contributors
+  license: DRL-1.1
+rules:
+- id: sigma.583aa0a2-30b1-4d62-8bf3-ab73689efe6c
+  enabled_env: RULE_JAVA_PAYLOAD_STRINGS_ENABLED
+  title: Java Payload Strings
+  description: Detects possible Java payloads in web access logs
+  level: high
+  logsource:
+    log_types: []
+    exclude_log_types: &id001
+    - ssh
+    - syslog
+    - firewall_waf
+    - mongodb
+    - mysql
+    - postgresql
+    - redis
+    - sqlserver
+    - oracle
+    - windows_rdp
+    - windows_evtx
+    - windows_event
+    - windows_auth_export
+    - unsupported_xlsx
+    display_log_types: &id002
+    - nginx_apache
+    - iis
+    - json
+    - csv
+  detection:
+    where:
+    - op: any_contains
+      field:
+      - field: url
+        transform: url_decode
+      - raw
+      values:
+      - '%24%7B%28%23a%3D%40'
+      - ${(#a=@
+      - '%24%7B%40java'
+      - ${@java
+      - u0022java
+      - '%2F%24%7B%23'
+      - /${#
+      - new+java.
+      - getRuntime().exec(
+      - getRuntime%28%29.exec%28
+    aggregate:
+      group_by:
+      - field: source_ip
+        default: unknown
+      bucket: true
+  event:
+    type: sigma_java_payload_strings
+    name: '[Sigma] Java Payload Strings'
+    level: high
+    summary: 社区规则「Java Payload Strings」命中 {count} 条记录（来源 {ip}），示例：{sample}
+  tags:
+  - cve.2022-26134
+  - cve.2021-26084
+  - attack.initial-access
+  - attack.T1190
+  source: sigma
+  author: frack113, Harjot Singh, "@cyb3rjy0t" (update)
+  references:
+  - https://www.rapid7.com/blog/post/2022/06/02/active-exploitation-of-confluence-cve-2022-26134/
+  - https://www.rapid7.com/blog/post/2021/09/02/active-exploitation-of-confluence-server-cve-2021-26084/
+  - https://github.com/httpvoid/writeups/blob/62d3751945289d088ccfdf4d0ffbf61598a2cd7d/Confluence-RCE.md
+  - https://twitter.com/httpvoid0x2f/status/1532924261035384832
+  - https://medium.com/geekculture/text4shell-exploit-walkthrough-ebc02a01f035
+  validation_status: validated
+- id: sigma.7745c2ea-24a5-4290-b680-04359cb84b35
+  enabled_env: RULE_PATH_TRAVERSAL_EXPLOITATION_ATTEMPTS_ENABLED
+  title: Path Traversal Exploitation Attempts
+  description: Detects path traversal exploitation attempts
+  level: medium
+  logsource:
+    log_types: []
+    exclude_log_types: *id001
+    display_log_types: *id002
+  detection:
+    where:
+    - op: any_contains
+      field: url
+      transform: url_decode
+      values:
+      - ../../../../../lib/password
+      - ../../../../windows/
+      - ../../../etc/
+      - ..%252f..%252f..%252fetc%252f
+      - ..%c0%af..%c0%af..%c0%afetc%c0%af
+      - '%252e%252e%252fetc%252f'
+    aggregate:
+      group_by:
+      - field: source_ip
+        default: unknown
+      bucket: true
+  event:
+    type: sigma_path_traversal_exploitation_attempts
+    name: '[Sigma] Path Traversal Exploitation Attempts'
+    level: medium
+    summary: 社区规则「Path Traversal Exploitation Attempts」命中 {count} 条记录（来源 {ip}），示例：{sample}
+  tags:
+  - attack.initial-access
+  - attack.T1190
+  source: sigma
+  author: Subhash Popuri (@pbssubhash), Florian Roth (Nextron Systems), Thurein Oo, Nasreddine Bencherchali (Nextron Systems)
+  references:
+  - https://github.com/projectdiscovery/nuclei-templates
+  - https://book.hacktricks.xyz/pentesting-web/file-inclusion
+  validation_status: validated
+- id: sigma.953d460b-f810-420a-97a2-cfca4c98e602
+  enabled_env: RULE_SOURCE_CODE_ENUMERATION_DETECTION_BY_KEYWORD_ENABLED
+  title: Source Code Enumeration Detection by Keyword
+  description: Detects source code enumeration that use GET requests by keyword searches in URL strings
+  level: medium
+  logsource:
+    log_types: []
+    exclude_log_types: *id001
+    display_log_types: *id002
+  detection:
+    where:
+    - op: any_contains
+      field:
+      - field: url
+        transform: url_decode
+      - raw
+      value: .git/
+    aggregate:
+      group_by:
+      - field: source_ip
+        default: unknown
+      bucket: true
+  event:
+    type: sigma_source_code_enumeration_detection_by_keyword
+    name: '[Sigma] Source Code Enumeration Detection by Keyword'
+    level: medium
+    summary: 社区规则「Source Code Enumeration Detection by Keyword」命中 {count} 条记录（来源 {ip}），示例：{sample}
+  tags:
+  - attack.discovery
+  - attack.T1083
+  source: sigma
+  author: James Ahearn
+  references:
+  - https://pentester.land/tutorials/2018/10/25/source-code-disclosure-via-exposed-git-folder.html
+  - https://medium.com/@logicbomb_1/bugbounty-how-i-was-able-to-download-the-source-code-of-indias-largest-telecom-service-52cf5c5640a1
+  validation_status: validated
+- id: sigma.5513deaf-f49a-46c2-a6c8-3f111b5cb453
+  enabled_env: RULE_SQL_INJECTION_STRINGS_IN_URI_ENABLED
+  title: SQL Injection Strings In URI
+  description: Detects potential SQL injection attempts via GET requests in access logs.
+  level: high
+  logsource:
+    log_types: []
+    exclude_log_types: *id001
+    display_log_types: *id002
+  detection:
+    where:
+    - op: equals
+      field: action
+      transform: upper
+      value: GET
+    - op: any_contains
+      field:
+      - field: url
+        transform: url_decode
+      - raw
+      values:
+      - '@@version'
+      - '%271%27%3D%271'
+      - '=select '
+      - =select(
+      - =select%20
+      - concat_ws(
+      - CONCAT(0x
+      - from mysql.innodb_table_stats
+      - from%20mysql.innodb_table_stats
+      - group_concat(
+      - information_schema.tables
+      - json_arrayagg(
+      - or 1=1#
+      - or%201=1#
+      - 'order by '
+      - order%20by%20
+      - 'select * '
+      - select database()
+      - select version()
+      - select%20*%20
+      - select%20database()
+      - select%20version()
+      - select%28sleep%2810%29
+      - SELECTCHAR(
+      - table_schema
+      - UNION ALL SELECT
+      - UNION SELECT
+      - UNION%20ALL%20SELECT
+      - UNION%20SELECT
+      - '''1''=''1'
+    - op: equals
+      field: status
+      value: '404'
+      negate: true
+    aggregate:
+      group_by:
+      - field: source_ip
+        default: unknown
+      bucket: true
+  event:
+    type: sigma_sql_injection_strings_in_uri
+    name: '[Sigma] SQL Injection Strings In URI'
+    level: high
+    summary: 社区规则「SQL Injection Strings In URI」命中 {count} 条记录（来源 {ip}），示例：{sample}
+  tags:
+  - attack.initial-access
+  - attack.T1190
+  source: sigma
+  author: Saw Win Naung, Nasreddine Bencherchali (Nextron Systems), Thurein Oo (Yoma Bank)
+  references:
+  - https://www.acunetix.com/blog/articles/exploiting-sql-injection-example/
+  - https://www.acunetix.com/blog/articles/using-logs-to-investigate-a-web-application-attack/
+  - https://brightsec.com/blog/sql-injection-payloads/
+  - https://github.com/payloadbox/sql-injection-payload-list
+  - https://book.hacktricks.xyz/pentesting-web/sql-injection/mysql-injection
+  validation_status: validated
+- id: sigma.19aa4f58-94ca-45ff-bc34-92e533c0994a
+  enabled_env: RULE_SUSPICIOUS_USER_AGENTS_RELATED_TO_RECON_TOOLS_ENABLED
+  title: Suspicious User-Agents Related To Recon Tools
+  description: Detects known suspicious (default) user-agents related to scanning/recon tools
+  level: medium
+  logsource:
+    log_types: []
+    exclude_log_types: *id001
+    display_log_types: *id002
+  detection:
+    where:
+    - op: any_contains
+      field: raw
+      transform: lower
+      values:
+      - commix/
+      - feroxbuster/
+      - Fuzz Faster U Fool
+      - GIS - AppSec Team - Project Vision
+      - gobuster/
+      - Nikto/
+      - Nmap Scripting Engine
+      - Recon-ng/v
+      - sqlmap/
+      - WhatWeb/
+      - Wfuzz/
+      - WPScan v
+      - zgrab/
+    aggregate:
+      group_by:
+      - field: source_ip
+        default: unknown
+      bucket: true
+  event:
+    type: sigma_suspicious_user_agents_related_to_recon_tools
+    name: '[Sigma] Suspicious User-Agents Related To Recon Tools'
+    level: medium
+    summary: 社区规则「Suspicious User-Agents Related To Recon Tools」命中 {count} 条记录（来源 {ip}），示例：{sample}
+  tags:
+  - attack.initial-access
+  - attack.T1190
+  source: sigma
+  author: Nasreddine Bencherchali (Nextron Systems), Tim Shelton
+  references:
+  - https://github.com/commixproject/commix/blob/c7f1447371524427bb30abe731235acc7386153b/src/utils/settings.py#L281
+  - https://github.com/epi052/feroxbuster/blob/ffdf871abe0a358a1531ba4135e208d4dbe8fc31/src/config/utils.rs#L100
+  - https://github.com/ffuf/ffuf/blob/ce3cf6bd733a24d3a9f024305234c1a6298198eb/pkg/runner/simple.go#L130
+  - https://github.com/lanmaster53/recon-ng/blob/9e907dfe09fce2997f0301d746796408e01a60b7/recon/core/base.py#L92
+  - https://github.com/nmap/nmap/blob/2e47fa87469fd358ef64689d2d2de7294e385eb8/nselib/http.lua#L160
+  - https://github.com/OJ/gobuster/blob/d20300cc46096984565e82fb73a45bf8d281b990/libgobuster/helpers.go#L124
+  - https://github.com/sqlmapproject/sqlmap/blob/be216041e2f255ae43b050d466bd5bf92681e665/lib/core/settings.py#L29
+  - https://github.com/sullo/nikto/blob/999670cb6a939b6c93840ce666941756e4c5dcf5/program/plugins/nikto_core.plugin#L3515
+  - https://github.com/urbanadventurer/WhatWeb/blob/d279d93042d034f3fd29d5a893d44ccc0595d3f8/lib/whatweb.rb#L68
+  - https://github.com/wpscanteam/wpscan/blob/4f1ce142b9768044be3e35bd0cddf1052e35efe8/lib/wpscan/browser.rb#L32
+  - https://github.com/xmendez/wfuzz/blob/2263cd0932fef333118cd197656f709141bab615/src/wfuzz/facade.py#L43
+  - https://github.com/zmap/zgrab2/blob/e91fc9860ca6611eb7c6fe7d2fe2be70212a37ba/modules/http/scanner.go#L54
+  validation_status: validated
+- id: sigma.65354b83-a2ea-4ea6-8414-3ab38be0d409
+  enabled_env: RULE_CROSS_SITE_SCRIPTING_STRINGS_ENABLED
+  title: Cross Site Scripting Strings
+  description: Detects XSS attempts injected via GET requests in access logs
+  level: high
+  logsource:
+    log_types: []
+    exclude_log_types: *id001
+    display_log_types: *id002
+  detection:
+    where:
+    - op: equals
+      field: action
+      transform: upper
+      value: GET
+    - op: any_contains
+      field:
+      - field: url
+        transform: url_decode
+      - raw
+      values:
+      - =<script>
+      - =%3Cscript%3E
+      - =%253Cscript%253E
+      - '<iframe '
+      - '%3Ciframe '
+      - '<svg '
+      - '%3Csvg '
+      - document.cookie
+      - document.domain
+      - ' onerror='
+      - ' onresize='
+      - ' onload="'
+      - onmouseover=
+      - ${alert
+      - javascript:alert
+      - javascript%3Aalert
+    - op: equals
+      field: status
+      value: '404'
+      negate: true
+    aggregate:
+      group_by:
+      - field: source_ip
+        default: unknown
+      bucket: true
+  event:
+    type: sigma_cross_site_scripting_strings
+    name: '[Sigma] Cross Site Scripting Strings'
+    level: high
+    summary: 社区规则「Cross Site Scripting Strings」命中 {count} 条记录（来源 {ip}），示例：{sample}
+  tags:
+  - attack.initial-access
+  - attack.T1189
+  source: sigma
+  author: Saw Win Naung, Nasreddine Bencherchali
+  references:
+  - https://github.com/payloadbox/xss-payload-list
+  - https://portswigger.net/web-security/cross-site-scripting/contexts
+  validation_status: validated
+- id: sigma.8e5c03fa-b7f0-11ea-b242-07e0576828d9
+  enabled_env: RULE_DENIED_ACCESS_TO_REMOTE_DESKTOP_ENABLED
+  title: Denied Access To Remote Desktop
+  description: 'This event is generated when an authenticated user who is not allowed to log on remotely attempts to connect to this computer through Remote Desktop.
+
+    Often, this event can be generated by attackers when searching for available windows servers in the network.'
+  level: medium
+  logsource:
+    log_types: &id003
+    - windows_rdp
+    - windows_evtx
+    display_log_types: *id003
+  detection:
+    where:
+    - op: equals
+      field: status
+      value: '4825'
+    aggregate:
+      group_by:
+      - field: target_asset
+        default: unknown
+      - field: process_image
+        default: unknown
+      bucket: true
+  event:
+    type: sigma_denied_access_to_remote_desktop
+    name: '[Sigma] Denied Access To Remote Desktop'
+    level: medium
+    summary: '{asset} 上社区规则「Denied Access To Remote Desktop」命中 {count} 次，示例：{sample}'
+  tags:
+  - attack.lateral-movement
+  - attack.T1021.001
+  source: sigma
+  author: Pushkarev Dmitry
+  references:
+  - https://www.ultimatewindowssecurity.com/securitylog/encyclopedia/event.aspx?eventid=4825
+  validation_status: validated
+- id: sigma.5bed80b6-b3e8-428e-a3ae-d3c757589e41
+  enabled_env: RULE_RDP_OVER_REVERSE_SSH_TUNNEL_WFP_ENABLED
+  title: RDP over Reverse SSH Tunnel WFP
+  description: Detects svchost hosting RDP termsvcs communicating with the loopback address
+  level: high
+  logsource:
+    log_types: *id003
+    display_log_types: *id003
+  detection:
+    where: []
+    aggregate:
+      group_by:
+      - field: target_asset
+        default: unknown
+      - field: process_image
+        default: unknown
+      bucket: true
+    any:
+    - - op: equals
+        field: status
+        value: '5156'
+      - op: equals
+        field: SourcePort
+        value: '3389'
+      - op: regex
+        field: destination_ip
+        value: ^127\..*$
+      - op: regex
+        field: destination_ip
+        value: ^::1$
+      - op: equals
+        field: FilterOrigin
+        value: AppContainer Loopback
+        negate: true
+      - op: any_endswith
+        field: Application
+        values:
+        - \thor.exe
+        - \thor64.exe
+        negate: true
+    - - op: equals
+        field: status
+        value: '5156'
+      - op: equals
+        field: destination_port
+        value: '3389'
+      - op: regex
+        field: source_ip
+        value: ^127\..*$
+      - op: regex
+        field: source_ip
+        value: ^::1$
+      - op: equals
+        field: FilterOrigin
+        value: AppContainer Loopback
+        negate: true
+      - op: any_endswith
+        field: Application
+        values:
+        - \thor.exe
+        - \thor64.exe
+        negate: true
+  event:
+    type: sigma_rdp_over_reverse_ssh_tunnel_wfp
+    name: '[Sigma] RDP over Reverse SSH Tunnel WFP'
+    level: high
+    summary: '{asset} 上社区规则「RDP over Reverse SSH Tunnel WFP」命中 {count} 次，示例：{sample}'
+  tags:
+  - attack.command-and-control
+  - attack.lateral-movement
+  - attack.T1090.001
+  - attack.T1090.002
+  - attack.T1021.001
+  - car.2013-07-002
+  source: sigma
+  author: Samir Bousseaden
+  references:
+  - https://twitter.com/SBousseaden/status/1096148422984384514
+  - https://github.com/sbousseaden/EVTX-ATTACK-SAMPLES/blob/44fbe85f72ee91582876b49678f9a26292a155fb/Command%20and%20Control/DE_RDP_Tunnel_5156.evtx
+  validation_status: unverified

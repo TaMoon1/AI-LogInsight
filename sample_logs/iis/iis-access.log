@@ -1,0 +1,7 @@
+#Software: Microsoft Internet Information Services 10.0
+#Version: 1.0
+#Date: 2026-09-17 09:00:00
+#Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) sc-status sc-substatus sc-win32-status time-taken
+2026-09-17 09:00:01 10.0.0.5 GET /index.html - 80 - 198.51.100.20 Mozilla/5.0 200 0 0 12
+2026-09-17 09:00:02 10.0.0.5 GET /.git/config - 80 - 203.0.113.20 scanner/1.0 403 0 2 8
+2026-09-17 09:00:03 10.0.0.5 GET /download - 80 - 203.0.113.21 curl/8.0 404 0 2 9

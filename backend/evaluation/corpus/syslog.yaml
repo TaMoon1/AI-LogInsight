@@ -1,0 +1,45 @@
+family: syslog / 容器日志（前缀剥离 + 应用层安全信号）
+description: |
+  syslog / 容器日志前缀（`时间 级别 主机 程序[PID]:`）需要先剥壳，再按内层内容分派：
+  内层是访问日志则复用 Web 行解析（时间戳取自前缀），内层是键值消息则映射成统一字段。
+  这里用整份真实日志断言完整行为清单，并单独锁住「正常业务流量零告警」——
+  剥壳后如果把所有应用日志都当可疑，门禁必须变红。
+cases:
+  - name: syslog-app-security-scenario
+    note: |
+      整份 syslog 日志：内嵌访问日志的敏感路径探测（`/.env`、`/server-status`），
+      加上应用自身记录的三类安全信号（敏感路径探测序列、认证阈值封禁、受限资源访问）。
+      少报即漏检，出现未预期事件即误报。
+    file: syslog-app-security.log
+    log_file: ../scenarios/syslog-app-security.log
+    expect:
+      - rule: web.sensitive_path
+        risk: medium
+        source_ip: 203.0.113.88
+      - rule: web.sensitive_interface
+        risk: medium
+        source_ip: 203.0.113.88
+      - rule: app.sensitive_path_probe
+        risk: medium
+        source_ip: 203.0.113.88
+        count: 1
+      - rule: app.auth_threshold_block
+        risk: medium
+        source_ip: 198.51.100.77
+        count: 2
+      - rule: app.restricted_resource_access
+        risk: medium
+        source_ip: 203.0.113.88
+        count: 1
+
+  - name: syslog-normal-business-negative
+    note: 正常业务、健康检查与访问日志 → 零告警
+    file: syslog.log
+    log: |
+      2026-09-21T08:00:01+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET / HTTP/1.1" 200 4218 "-" "Mozilla/5.0"
+      2026-09-21T08:00:13+08:00 INFO  app01 auth[5312]: user_login user_id=10428 src_ip=198.51.100.23 result=success
+      2026-09-21T08:00:22+08:00 INFO  app01 app[5312]: health_check service=nginx status=ok
+      2026-09-21T08:00:29+08:00 INFO  app01 app[5312]: api_request endpoint=/api/profile user_id=10428 result=success latency_ms=42
+      2026-09-21T08:00:35+08:00 INFO  app01 app[5312]: product_view user_id=10428 product_id=218 result=success
+    expect: []
+    forbid: []

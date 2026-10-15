@@ -1,0 +1,4 @@
+# 构建 Windows 便携版（scripts/build_exe.py）所需的构建期依赖。
+# 运行时不依赖这些包，因此与 requirements.txt 分开：
+#     .venv\Scripts\python.exe -m pip install -r requirements-build.txt
+pyinstaller==6.22.3

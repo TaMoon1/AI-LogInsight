@@ -1,0 +1,42 @@
+family: 规模（大日志）
+description: |
+  规模用例检验的是**结论不被规模稀释**：大量正常记录里藏一条真实异常，
+  AI 仍须把它检出来，且不得因为「记录很多」就编造未发生的攻击，也不得把
+  采样口径当成全量口径（AGENTS.md §36：AI 只拿关键事件 + 统计 + 必要证据）。
+
+  期望值依据：`/.env` 单条即命中 `web.sensitive_path`（实测 medium），
+  与周围正常记录的数量无关。因此「淹没在正常流量里」不构成漏报理由。
+cases:
+  - name: one-anomaly-among-thousands
+    note: |
+      3000 条正常健康检查中夹 1 条敏感路径探测。真实异常必须被检出；
+      结论中不得出现日志里没有的 IP（规模大最容易诱发编造）。
+    file: access.log
+    generator:
+      kind: repeat
+      times: 3000
+      template: |
+        198.51.100.10 - - [29/Sep/2026:09:00:00 +0800] "GET /health HTTP/1.1" 200 {i} "-" "Mozilla/5.0"
+    append: |
+      203.0.113.31 - - [29/Sep/2026:09:30:00 +0800] "GET /.env HTTP/1.1" 403 12 "-" "curl/8.0"
+    expect:
+      suspicious: true
+      risk_levels: [medium, high]
+      forbid_risk_levels: [critical]
+      min_behaviors: 1
+      evidence_keywords: ["203.0.113.31"]
+
+  - name: all-benign-at-scale
+    note: |
+      3000 条全部正常。规模本身不是异常——不得因为「量大」而升级风险，
+      这是与上一条配对的负样本。
+    file: access.log
+    generator:
+      kind: repeat
+      times: 3000
+      template: |
+        198.51.100.10 - - [29/Sep/2026:09:00:00 +0800] "GET /health HTTP/1.1" 200 {i} "-" "Mozilla/5.0"
+    expect:
+      suspicious: false
+      risk_levels: [info, low]
+      forbid_risk_levels: [high, critical]

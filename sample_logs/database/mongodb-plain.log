@@ -1,0 +1,13 @@
+2026-09-17T10:00:00.123+0800 I CONTROL  [initandlisten] MongoDB starting : pid=1234 port=27017 dbpath=/data/db 64-bit host=db01
+2026-09-17T10:00:01.456+0800 I NETWORK  [conn1] connection accepted from 192.168.1.70:5001 #1 (1 connection now open)
+2026-09-17T10:00:02.789+0800 I ACCESS   [conn1] Failed to authenticate admin@admin with SCRAM-SHA-1
+2026-09-17T10:00:03.000+0800 I ACCESS   [conn2] Failed to authenticate admin@admin with SCRAM-SHA-1
+2026-09-17T10:00:04.100+0800 I ACCESS   [conn3] Failed to authenticate admin@admin with SCRAM-SHA-1
+2026-09-17T10:00:05.200+0800 I ACCESS   [conn4] Failed to authenticate admin@admin with SCRAM-SHA-1
+2026-09-17T10:00:06.300+0800 I ACCESS   [conn5] Failed to authenticate admin@admin with SCRAM-SHA-1
+2026-09-17T10:00:07.400+0800 I ACCESS   [conn6] Failed to authenticate admin@admin with SCRAM-SHA-1
+2026-09-17T10:00:08.500+0800 I ACCESS   [conn7] Failed to authenticate admin@admin with SCRAM-SHA-1
+2026-09-17T10:00:09.600+0800 I ACCESS   [conn8] Failed to authenticate admin@admin with SCRAM-SHA-1
+2026-09-17T10:00:10.700+0800 I ACCESS   [conn9] Failed to authenticate admin@admin with SCRAM-SHA-1
+2026-09-17T10:00:11.800+0800 I ACCESS   [conn10] Failed to authenticate admin@admin with SCRAM-SHA-1
+2026-09-17T10:00:12.900+0800 I ACCESS   [conn11] Successfully authenticated admin@admin from 192.168.1.70:5011

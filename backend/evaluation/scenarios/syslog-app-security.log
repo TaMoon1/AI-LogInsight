@@ -1,0 +1,285 @@
+2026-09-21T08:00:01+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET / HTTP/1.1" 200 4218 "-" "Mozilla/5.0"
+2026-09-21T08:00:03+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /static/css/main.css HTTP/1.1" 200 18342 "https://example.test/" "Mozilla/5.0"
+2026-09-21T08:00:05+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /static/js/app.js HTTP/1.1" 200 28391 "https://example.test/" "Mozilla/5.0"
+2026-09-21T08:00:08+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /login HTTP/1.1" 200 5231 "-" "Mozilla/5.0"
+2026-09-21T08:00:12+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "POST /login HTTP/1.1" 302 812 "https://example.test/login" "Mozilla/5.0"
+2026-09-21T08:00:13+08:00 INFO  app01 auth[5312]: user_login user_id=10428 src_ip=198.51.100.23 result=success
+2026-09-21T08:00:17+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /dashboard HTTP/1.1" 200 8421 "-" "Mozilla/5.0"
+2026-09-21T08:00:22+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /api/profile HTTP/1.1" 200 1932 "https://example.test/dashboard" "Mozilla/5.0"
+2026-09-21T08:00:29+08:00 INFO  app01 app[5312]: api_request endpoint=/api/profile user_id=10428 result=success latency_ms=42
+2026-09-21T08:00:36+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /products HTTP/1.1" 200 9127 "-" "Mozilla/5.0"
+2026-09-21T08:00:42+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /products/218 HTTP/1.1" 200 6412 "https://example.test/products" "Mozilla/5.0"
+2026-09-21T08:00:49+08:00 INFO  app01 app[5312]: product_view user_id=10428 product_id=218 result=success
+2026-09-21T08:01:02+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /search?q=keyboard HTTP/1.1" 200 5128 "-" "Mozilla/5.0"
+2026-09-21T08:01:11+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /search?q=mouse HTTP/1.1" 200 4932 "-" "Mozilla/5.0"
+2026-09-21T08:01:18+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /search?q=headset HTTP/1.1" 200 5211 "-" "Mozilla/5.0"
+2026-09-21T08:01:27+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /cart HTTP/1.1" 200 3487 "-" "Mozilla/5.0"
+2026-09-21T08:01:34+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "POST /api/cart HTTP/1.1" 201 732 "https://example.test/products/218" "Mozilla/5.0"
+2026-09-21T08:01:35+08:00 INFO  app01 app[5312]: cart_update user_id=10428 item_id=218 action=add result=success
+2026-09-21T08:01:43+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /help HTTP/1.1" 200 3851 "-" "Mozilla/5.0"
+2026-09-21T08:01:51+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /faq HTTP/1.1" 200 4421 "https://example.test/help" "Mozilla/5.0"
+2026-09-21T08:02:03+08:00 INFO  app01 app[5312]: health_check service=database status=healthy latency_ms=8
+2026-09-21T08:02:14+08:00 INFO  app01 app[5312]: health_check service=cache status=healthy latency_ms=3
+2026-09-21T08:02:22+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /orders HTTP/1.1" 200 7318 "-" "Mozilla/5.0"
+2026-09-21T08:02:31+08:00 INFO  app01 app[5312]: order_query user_id=10428 count=3 result=success
+2026-09-21T08:02:43+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /notifications HTTP/1.1" 200 2841 "-" "Mozilla/5.0"
+2026-09-21T08:02:57+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /profile/settings HTTP/1.1" 200 6312 "-" "Mozilla/5.0"
+2026-09-21T08:03:08+08:00 INFO  app01 app[5312]: session_refresh user_id=10428 result=success
+2026-09-21T08:03:17+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /static/images/banner.webp HTTP/1.1" 200 48291 "https://example.test/" "Mozilla/5.0"
+2026-09-21T08:03:29+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /checkout HTTP/1.1" 200 6218 "-" "Mozilla/5.0"
+2026-09-21T08:03:41+08:00 INFO  app01 app[5312]: checkout_view user_id=10428 cart_items=2 result=success
+2026-09-21T08:03:56+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /api/products?page=1 HTTP/1.1" 200 15421 "-" "Mozilla/5.0"
+2026-09-21T08:04:03+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /api/products?page=2 HTTP/1.1" 200 15122 "-" "Mozilla/5.0"
+2026-09-21T08:04:15+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /api/products?page=3 HTTP/1.1" 200 14883 "-" "Mozilla/5.0"
+2026-09-21T08:04:29+08:00 INFO  app01 app[5312]: scheduled_job job=cleanup_sessions status=completed duration_ms=127
+2026-09-21T08:04:38+08:00 INFO  app01 app[5312]: scheduled_job job=refresh_cache status=completed duration_ms=219
+2026-09-21T08:04:51+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /support HTTP/1.1" 200 3918 "-" "Mozilla/5.0"
+2026-09-21T08:05:07+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "POST /api/order/preview HTTP/1.1" 200 918 "https://example.test/checkout" "Mozilla/5.0"
+2026-09-21T08:05:15+08:00 INFO  app01 app[5312]: order_preview user_id=10428 items=2 total=68.00 result=success
+2026-09-21T08:05:27+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "POST /api/payment/prepare HTTP/1.1" 200 743 "https://example.test/checkout" "Mozilla/5.0"
+2026-09-21T08:05:31+08:00 INFO  app01 app[5312]: payment_prepare user_id=10428 result=success
+2026-09-21T08:05:46+08:00 INFO  app01 app[5312]: payment_status order_id=ORD-20260921-8821 result=success
+2026-09-21T08:05:53+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /order/ORD-20260921-8821 HTTP/1.1" 200 5341 "-" "Mozilla/5.0"
+2026-09-21T08:06:02+08:00 INFO  app01 app[5312]: audit action=view_order user_id=10428 order_id=ORD-20260921-8821 result=success
+2026-09-21T08:06:19+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET / HTTP/1.1" 200 4218 "-" "Mozilla/5.0"
+2026-09-21T08:06:28+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /news HTTP/1.1" 200 5821 "-" "Mozilla/5.0"
+2026-09-21T08:06:41+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /news/2026/09/21 HTTP/1.1" 200 7218 "-" "Mozilla/5.0"
+2026-09-21T08:06:53+08:00 INFO  app01 app[5312]: news_view user_id=10428 article_id=882 result=success
+2026-09-21T08:07:09+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "POST /api/favorite HTTP/1.1" 201 392 "https://example.test/news/2026/09/21" "Mozilla/5.0"
+2026-09-21T08:07:16+08:00 INFO  app01 app[5312]: favorite_add user_id=10428 article_id=882 result=success
+2026-09-21T08:07:32+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /account HTTP/1.1" 200 4312 "-" "Mozilla/5.0"
+2026-09-21T08:07:45+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /account/security HTTP/1.1" 200 5122 "-" "Mozilla/5.0"
+2026-09-21T08:07:59+08:00 INFO  app01 app[5312]: audit action=view_security_settings user_id=10428 result=success
+2026-09-21T08:08:13+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /products/312 HTTP/1.1" 200 6418 "-" "Mozilla/5.0"
+2026-09-21T08:08:21+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /products/313 HTTP/1.1" 200 6492 "-" "Mozilla/5.0"
+2026-09-21T08:08:37+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /products/314 HTTP/1.1" 200 6381 "-" "Mozilla/5.0"
+2026-09-21T08:08:51+08:00 INFO  app01 app[5312]: product_search query="office" result_count=24 latency_ms=31
+2026-09-21T08:09:03+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /search?q=office HTTP/1.1" 200 6143 "-" "Mozilla/5.0"
+2026-09-21T08:09:18+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /categories HTTP/1.1" 200 4821 "-" "Mozilla/5.0"
+2026-09-21T08:09:34+08:00 INFO  app01 app[5312]: cache_hit key=category:list result=true latency_ms=2
+2026-09-21T08:09:49+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /category/electronics HTTP/1.1" 200 7214 "-" "Mozilla/5.0"
+2026-09-21T08:10:01+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /logout HTTP/1.1" 302 512 "-" "Mozilla/5.0"
+2026-09-21T08:10:02+08:00 INFO  app01 auth[5312]: user_logout user_id=10428 src_ip=198.51.100.23 result=success
+2026-09-21T08:10:19+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET / HTTP/1.1" 200 4218 "-" "Mozilla/5.0"
+2026-09-21T08:10:27+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /login HTTP/1.1" 200 5231 "-" "Mozilla/5.0"
+2026-09-21T08:10:42+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "POST /login HTTP/1.1" 302 812 "https://example.test/login" "Mozilla/5.0"
+2026-09-21T08:10:43+08:00 INFO  app01 auth[5312]: user_login user_id=10882 src_ip=203.0.113.31 result=success
+2026-09-21T08:10:57+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /dashboard HTTP/1.1" 200 8418 "-" "Mozilla/5.0"
+2026-09-21T08:11:09+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /reports HTTP/1.1" 200 7281 "-" "Mozilla/5.0"
+2026-09-21T08:11:21+08:00 INFO  app01 app[5312]: report_query user_id=10882 period=monthly result=success
+2026-09-21T08:11:38+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /about HTTP/1.1" 200 4128 "-" "Mozilla/5.0"
+2026-09-21T08:11:52+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /help/contact HTTP/1.1" 200 3912 "-" "Mozilla/5.0"
+2026-09-21T08:12:06+08:00 INFO  app01 app[5312]: health_check service=database status=healthy latency_ms=9
+2026-09-21T08:12:14+08:00 INFO  app01 app[5312]: health_check service=cache status=healthy latency_ms=4
+2026-09-21T08:12:29+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /download/report HTTP/1.1" 200 28192 "-" "Mozilla/5.0"
+2026-09-21T08:12:41+08:00 INFO  app01 app[5312]: report_download user_id=10882 format=pdf result=success
+2026-09-21T08:12:58+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /settings HTTP/1.1" 200 4818 "-" "Mozilla/5.0"
+2026-09-21T08:13:17+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /api/notifications HTTP/1.1" 200 2811 "-" "Mozilla/5.0"
+2026-09-21T08:13:29+08:00 INFO  app01 app[5312]: notification_read user_id=10428 notification_id=918 result=success
+2026-09-21T08:13:46+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /static/fonts/main.woff2 HTTP/1.1" 200 18292 "https://example.test/" "Mozilla/5.0"
+2026-09-21T08:14:01+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /service/status HTTP/1.1" 200 981 "-" "Mozilla/5.0"
+2026-09-21T08:14:19+08:00 INFO  app01 app[5312]: service_status api=healthy database=healthy cache=healthy
+2026-09-21T08:14:36+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /orders?page=2 HTTP/1.1" 200 7021 "-" "Mozilla/5.0"
+2026-09-21T08:14:51+08:00 INFO  app01 app[5312]: order_query user_id=10428 page=2 count=1 result=success
+
+2026-09-21T08:15:03+08:00 WARN  app01 nginx[2148]: 203.0.113.88 - - "GET /admin HTTP/1.1" 403 421 "-" "security-test-client/1.0"
+2026-09-21T08:15:04+08:00 WARN  app01 nginx[2148]: 203.0.113.88 - - "GET /backup HTTP/1.1" 404 178 "-" "security-test-client/1.0"
+2026-09-21T08:15:06+08:00 WARN  app01 nginx[2148]: 203.0.113.88 - - "GET /.env HTTP/1.1" 403 421 "-" "security-test-client/1.0"
+2026-09-21T08:15:08+08:00 WARN  app01 security[5312]: suspicious_path_sequence src_ip=203.0.113.88 paths="/admin,/backup,/.env" action=logged
+
+2026-09-21T08:15:21+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /products HTTP/1.1" 200 9127 "-" "Mozilla/5.0"
+2026-09-21T08:15:34+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /products/412 HTTP/1.1" 200 6231 "-" "Mozilla/5.0"
+2026-09-21T08:15:49+08:00 INFO  app01 app[5312]: product_view user_id=10882 product_id=412 result=success
+2026-09-21T08:16:02+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /cart HTTP/1.1" 200 3481 "-" "Mozilla/5.0"
+2026-09-21T08:16:17+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "POST /api/cart HTTP/1.1" 201 731 "https://example.test/products/412" "Mozilla/5.0"
+2026-09-21T08:16:18+08:00 INFO  app01 app[5312]: cart_update user_id=10882 item_id=412 action=add result=success
+2026-09-21T08:16:31+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /wishlist HTTP/1.1" 200 3912 "-" "Mozilla/5.0"
+2026-09-21T08:16:45+08:00 INFO  app01 app[5312]: wishlist_query user_id=10428 count=7 result=success
+2026-09-21T08:17:01+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /faq/security HTTP/1.1" 200 3812 "-" "Mozilla/5.0"
+2026-09-21T08:17:19+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /api/user/preferences HTTP/1.1" 200 1821 "-" "Mozilla/5.0"
+2026-09-21T08:17:31+08:00 INFO  app01 app[5312]: preferences_read user_id=10882 result=success
+2026-09-21T08:17:46+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /orders/latest HTTP/1.1" 200 4811 "-" "Mozilla/5.0"
+2026-09-21T08:18:03+08:00 INFO  app01 app[5312]: order_query user_id=10428 period=latest result=success
+2026-09-21T08:18:18+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /account/profile HTTP/1.1" 200 4281 "-" "Mozilla/5.0"
+2026-09-21T08:18:32+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /api/messages?page=1 HTTP/1.1" 200 2821 "-" "Mozilla/5.0"
+2026-09-21T08:18:49+08:00 INFO  app01 app[5312]: message_query user_id=10882 count=4 result=success
+2026-09-21T08:19:04+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /logout HTTP/1.1" 302 512 "-" "Mozilla/5.0"
+2026-09-21T08:19:05+08:00 INFO  app01 auth[5312]: user_logout user_id=10428 src_ip=198.51.100.23 result=success
+2026-09-21T08:19:21+08:00 INFO  app01 app[5312]: scheduled_job job=cleanup_sessions status=completed duration_ms=118
+2026-09-21T08:19:37+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET / HTTP/1.1" 200 4218 "-" "Mozilla/5.0"
+2026-09-21T08:19:51+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /login HTTP/1.1" 200 5231 "-" "Mozilla/5.0"
+
+2026-09-21T08:20:03+08:00 WARN  app01 auth[5312]: authentication_failure user_id=10428 src_ip=198.51.100.77 attempt=1 result=failed
+2026-09-21T08:20:06+08:00 WARN  app01 auth[5312]: authentication_failure user_id=10428 src_ip=198.51.100.77 attempt=2 result=failed
+2026-09-21T08:20:09+08:00 WARN  app01 auth[5312]: authentication_failure user_id=10428 src_ip=198.51.100.77 attempt=3 result=failed
+2026-09-21T08:20:12+08:00 WARN  app01 auth[5312]: authentication_failure user_id=10428 src_ip=198.51.100.77 attempt=4 result=failed
+2026-09-21T08:20:15+08:00 WARN  app01 auth[5312]: authentication_failure user_id=10428 src_ip=198.51.100.77 attempt=5 result=failed
+2026-09-21T08:20:16+08:00 WARN  app01 auth[5312]: rate_limit_triggered src_ip=198.51.100.77 rule=login_attempt_threshold action=temporary_block
+2026-09-21T08:20:21+08:00 INFO  app01 security[5312]: temporary_block src_ip=198.51.100.77 duration=300s reason=authentication_threshold
+
+2026-09-21T08:20:34+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET / HTTP/1.1" 200 4218 "-" "Mozilla/5.0"
+2026-09-21T08:20:47+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /dashboard HTTP/1.1" 200 8418 "-" "Mozilla/5.0"
+2026-09-21T08:21:03+08:00 INFO  app01 app[5312]: dashboard_load user_id=10882 widgets=8 result=success
+2026-09-21T08:21:17+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /api/activity HTTP/1.1" 200 3921 "-" "Mozilla/5.0"
+2026-09-21T08:21:29+08:00 INFO  app01 app[5312]: activity_query user_id=10882 count=12 result=success
+2026-09-21T08:21:45+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /products/515 HTTP/1.1" 200 6218 "-" "Mozilla/5.0"
+2026-09-21T08:22:01+08:00 INFO  app01 app[5312]: product_view user_id=10428 product_id=515 result=success
+2026-09-21T08:22:16+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /api/recommendations HTTP/1.1" 200 8121 "-" "Mozilla/5.0"
+2026-09-21T08:22:31+08:00 INFO  app01 app[5312]: recommendation_query user_id=10882 count=8 result=success
+2026-09-21T08:22:48+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /settings/notifications HTTP/1.1" 200 4218 "-" "Mozilla/5.0"
+2026-09-21T08:23:03+08:00 INFO  app01 app[5312]: notification_settings user_id=10428 result=success
+2026-09-21T08:23:19+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /terms HTTP/1.1" 200 8122 "-" "Mozilla/5.0"
+2026-09-21T08:23:34+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /privacy HTTP/1.1" 200 7218 "-" "Mozilla/5.0"
+2026-09-21T08:23:51+08:00 INFO  app01 app[5312]: audit action=view_privacy_policy user_id=10882 result=success
+2026-09-21T08:24:07+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /support/tickets HTTP/1.1" 200 6211 "-" "Mozilla/5.0"
+2026-09-21T08:24:19+08:00 INFO  app01 app[5312]: ticket_query user_id=10428 count=1 result=success
+2026-09-21T08:24:37+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /downloads HTTP/1.1" 200 4921 "-" "Mozilla/5.0"
+2026-09-21T08:24:52+08:00 INFO  app01 app[5312]: download_list user_id=10428 count=5 result=success
+2026-09-21T08:25:09+08:00 INFO  app01 app[5312]: health_check service=database status=healthy latency_ms=7
+2026-09-21T08:25:21+08:00 INFO  app01 app[5312]: health_check service=cache status=healthy latency_ms=3
+2026-09-21T08:25:38+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /api/config HTTP/1.1" 200 912 "-" "Mozilla/5.0"
+2026-09-21T08:25:51+08:00 INFO  app01 app[5312]: config_read user_id=10882 result=success
+
+2026-09-21T08:26:03+08:00 WARN  app01 nginx[2148]: 203.0.113.88 - - "GET /server-status HTTP/1.1" 403 421 "-" "security-test-client/1.0"
+2026-09-21T08:26:05+08:00 WARN  app01 nginx[2148]: 203.0.113.88 - - "GET /debug HTTP/1.1" 403 421 "-" "security-test-client/1.0"
+2026-09-21T08:26:07+08:00 WARN  app01 security[5312]: restricted_resource_access src_ip=203.0.113.88 resource="/server-status,/debug" action=blocked
+
+2026-09-21T08:26:21+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /products HTTP/1.1" 200 9127 "-" "Mozilla/5.0"
+2026-09-21T08:26:34+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /products/601 HTTP/1.1" 200 6181 "-" "Mozilla/5.0"
+2026-09-21T08:26:47+08:00 INFO  app01 app[5312]: product_view user_id=10428 product_id=601 result=success
+2026-09-21T08:27:02+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /cart HTTP/1.1" 200 3487 "-" "Mozilla/5.0"
+2026-09-21T08:27:18+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "POST /api/cart HTTP/1.1" 201 732 "-" "Mozilla/5.0"
+2026-09-21T08:27:19+08:00 INFO  app01 app[5312]: cart_update user_id=10428 item_id=601 action=add result=success
+2026-09-21T08:27:36+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /orders HTTP/1.1" 200 7318 "-" "Mozilla/5.0"
+2026-09-21T08:27:48+08:00 INFO  app01 app[5312]: order_query user_id=10882 count=2 result=success
+2026-09-21T08:28:03+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /profile HTTP/1.1" 200 4812 "-" "Mozilla/5.0"
+2026-09-21T08:28:18+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /profile HTTP/1.1" 200 4812 "-" "Mozilla/5.0"
+2026-09-21T08:28:32+08:00 INFO  app01 app[5312]: profile_read user_id=10428 result=success
+2026-09-21T08:28:49+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /api/dashboard/summary HTTP/1.1" 200 2918 "-" "Mozilla/5.0"
+2026-09-21T08:29:06+08:00 INFO  app01 app[5312]: dashboard_summary user_id=10882 result=success
+2026-09-21T08:29:21+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /reports/daily HTTP/1.1" 200 6217 "-" "Mozilla/5.0"
+2026-09-21T08:29:36+08:00 INFO  app01 app[5312]: report_query user_id=10428 period=daily result=success
+2026-09-21T08:29:53+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /help HTTP/1.1" 200 3851 "-" "Mozilla/5.0"
+2026-09-21T08:30:08+08:00 INFO  app01 app[5312]: scheduled_job job=refresh_cache status=completed duration_ms=202
+2026-09-21T08:30:22+08:00 INFO  app01 app[5312]: scheduled_job job=cleanup_sessions status=completed duration_ms=121
+2026-09-21T08:30:39+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /api/system/status HTTP/1.1" 200 821 "-" "Mozilla/5.0"
+2026-09-21T08:30:51+08:00 INFO  app01 app[5312]: system_status cpu=34 memory=61 disk=48 status=healthy
+2026-09-21T08:31:07+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /news HTTP/1.1" 200 5821 "-" "Mozilla/5.0"
+2026-09-21T08:31:23+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /news/2026/09/21 HTTP/1.1" 200 7218 "-" "Mozilla/5.0"
+2026-09-21T08:31:39+08:00 INFO  app01 app[5312]: news_view user_id=10428 article_id=882 result=success
+2026-09-21T08:31:54+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /events HTTP/1.1" 200 4812 "-" "Mozilla/5.0"
+2026-09-21T08:32:11+08:00 INFO  app01 app[5312]: event_query user_id=10882 count=4 result=success
+2026-09-21T08:32:28+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /calendar HTTP/1.1" 200 3912 "-" "Mozilla/5.0"
+2026-09-21T08:32:43+08:00 INFO  app01 app[5312]: calendar_query user_id=10428 month=2026-09 result=success
+2026-09-21T08:33:01+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /messages HTTP/1.1" 200 3911 "-" "Mozilla/5.0"
+2026-09-21T08:33:17+08:00 INFO  app01 app[5312]: message_query user_id=10428 count=2 result=success
+2026-09-21T08:33:31+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /preferences HTTP/1.1" 200 4217 "-" "Mozilla/5.0"
+2026-09-21T08:33:48+08:00 INFO  app01 app[5312]: preferences_read user_id=10882 result=success
+2026-09-21T08:34:05+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /logout HTTP/1.1" 302 512 "-" "Mozilla/5.0"
+2026-09-21T08:34:06+08:00 INFO  app01 auth[5312]: user_logout user_id=10428 src_ip=192.0.2.41 result=success
+2026-09-21T08:34:21+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /login HTTP/1.1" 200 5231 "-" "Mozilla/5.0"
+2026-09-21T08:34:35+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "POST /login HTTP/1.1" 302 812 "https://example.test/login" "Mozilla/5.0"
+2026-09-21T08:34:36+08:00 INFO  app01 auth[5312]: user_login user_id=10882 src_ip=203.0.113.31 result=success
+2026-09-21T08:34:53+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /dashboard HTTP/1.1" 200 8418 "-" "Mozilla/5.0"
+2026-09-21T08:35:08+08:00 INFO  app01 app[5312]: dashboard_load user_id=10882 widgets=8 result=success
+2026-09-21T08:35:23+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /products HTTP/1.1" 200 9127 "-" "Mozilla/5.0"
+2026-09-21T08:35:39+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /products/722 HTTP/1.1" 200 6182 "-" "Mozilla/5.0"
+2026-09-21T08:35:54+08:00 INFO  app01 app[5312]: product_view user_id=10428 product_id=722 result=success
+2026-09-21T08:36:11+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /search?q=monitor HTTP/1.1" 200 5128 "-" "Mozilla/5.0"
+2026-09-21T08:36:27+08:00 INFO  app01 app[5312]: product_search query="monitor" result_count=18 latency_ms=29
+2026-09-21T08:36:44+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /products/804 HTTP/1.1" 200 6318 "-" "Mozilla/5.0"
+2026-09-21T08:37:01+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /reviews/804 HTTP/1.1" 200 4218 "-" "Mozilla/5.0"
+2026-09-21T08:37:19+08:00 INFO  app01 app[5312]: review_query product_id=804 count=31 result=success
+2026-09-21T08:37:35+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "POST /api/favorite HTTP/1.1" 201 392 "-" "Mozilla/5.0"
+2026-09-21T08:37:36+08:00 INFO  app01 app[5312]: favorite_add user_id=10428 article_id=804 result=success
+2026-09-21T08:37:52+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /support HTTP/1.1" 200 3918 "-" "Mozilla/5.0"
+2026-09-21T08:38:09+08:00 INFO  app01 app[5312]: support_article_view user_id=10428 article_id=42 result=success
+2026-09-21T08:38:27+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /api/support/articles HTTP/1.1" 200 8211 "-" "Mozilla/5.0"
+2026-09-21T08:38:43+08:00 INFO  app01 app[5312]: support_search query="account" result_count=12
+2026-09-21T08:39:01+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /account/security HTTP/1.1" 200 5122 "-" "Mozilla/5.0"
+2026-09-21T08:39:18+08:00 INFO  app01 app[5312]: audit action=view_security_settings user_id=10428 result=success
+2026-09-21T08:39:34+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /privacy HTTP/1.1" 200 7218 "-" "Mozilla/5.0"
+2026-09-21T08:39:49+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /terms HTTP/1.1" 200 8122 "-" "Mozilla/5.0"
+2026-09-21T08:40:03+08:00 INFO  app01 app[5312]: scheduled_job job=cleanup_sessions status=completed duration_ms=132
+2026-09-21T08:40:18+08:00 INFO  app01 app[5312]: health_check service=database status=healthy latency_ms=8
+2026-09-21T08:40:32+08:00 INFO  app01 app[5312]: health_check service=cache status=healthy latency_ms=3
+
+2026-09-21T08:41:03+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET / HTTP/1.1" 200 4218 "-" "Mozilla/5.0"
+2026-09-21T08:41:17+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /dashboard HTTP/1.1" 200 8421 "-" "Mozilla/5.0"
+2026-09-21T08:41:31+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /api/profile HTTP/1.1" 200 1932 "-" "Mozilla/5.0"
+2026-09-21T08:41:46+08:00 INFO  app01 app[5312]: api_request endpoint=/api/profile user_id=10882 result=success latency_ms=42
+2026-09-21T08:42:01+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /products HTTP/1.1" 200 9127 "-" "Mozilla/5.0"
+2026-09-21T08:42:17+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /orders HTTP/1.1" 200 7318 "-" "Mozilla/5.0"
+2026-09-21T08:42:32+08:00 INFO  app01 app[5312]: order_query user_id=10428 count=3 result=success
+2026-09-21T08:42:48+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /notifications HTTP/1.1" 200 2841 "-" "Mozilla/5.0"
+2026-09-21T08:43:04+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /settings HTTP/1.1" 200 4818 "-" "Mozilla/5.0"
+2026-09-21T08:43:19+08:00 INFO  app01 app[5312]: settings_read user_id=10428 result=success
+2026-09-21T08:43:36+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /help HTTP/1.1" 200 3851 "-" "Mozilla/5.0"
+2026-09-21T08:43:51+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /about HTTP/1.1" 200 4128 "-" "Mozilla/5.0"
+2026-09-21T08:44:07+08:00 INFO  app01 app[5312]: health_check service=database status=healthy latency_ms=8
+2026-09-21T08:44:23+08:00 INFO  app01 app[5312]: health_check service=cache status=healthy latency_ms=3
+2026-09-21T08:44:39+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /api/products?page=4 HTTP/1.1" 200 14821 "-" "Mozilla/5.0"
+2026-09-21T08:44:55+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /api/products?page=5 HTTP/1.1" 200 14931 "-" "Mozilla/5.0"
+2026-09-21T08:45:11+08:00 INFO  app01 app[5312]: product_search query="laptop" result_count=32 latency_ms=34
+2026-09-21T08:45:27+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /search?q=laptop HTTP/1.1" 200 6128 "-" "Mozilla/5.0"
+2026-09-21T08:45:43+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /products/901 HTTP/1.1" 200 6318 "-" "Mozilla/5.0"
+2026-09-21T08:45:59+08:00 INFO  app01 app[5312]: product_view user_id=10428 product_id=901 result=success
+2026-09-21T08:46:15+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /cart HTTP/1.1" 200 3487 "-" "Mozilla/5.0"
+2026-09-21T08:46:31+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "POST /api/order/preview HTTP/1.1" 200 918 "-" "Mozilla/5.0"
+2026-09-21T08:46:47+08:00 INFO  app01 app[5312]: order_preview user_id=10428 items=1 total=29.00 result=success
+2026-09-21T08:47:03+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /checkout HTTP/1.1" 200 6218 "-" "Mozilla/5.0"
+2026-09-21T08:47:19+08:00 INFO  app01 app[5312]: checkout_view user_id=10882 cart_items=1 result=success
+2026-09-21T08:47:35+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /support/contact HTTP/1.1" 200 3912 "-" "Mozilla/5.0"
+2026-09-21T08:47:51+08:00 INFO  app01 app[5312]: support_contact_view user_id=10428 result=success
+2026-09-21T08:48:07+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /messages HTTP/1.1" 200 3911 "-" "Mozilla/5.0"
+2026-09-21T08:48:23+08:00 INFO  app01 app[5312]: message_query user_id=10428 count=2 result=success
+2026-09-21T08:48:39+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /profile HTTP/1.1" 200 4812 "-" "Mozilla/5.0"
+2026-09-21T08:48:55+08:00 INFO  app01 app[5312]: profile_read user_id=10882 result=success
+2026-09-21T08:49:11+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /faq HTTP/1.1" 200 4421 "-" "Mozilla/5.0"
+2026-09-21T08:49:27+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /news HTTP/1.1" 200 5821 "-" "Mozilla/5.0"
+2026-09-21T08:49:43+08:00 INFO  app01 app[5312]: news_query user_id=10428 count=8 result=success
+2026-09-21T08:49:59+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /events HTTP/1.1" 200 4812 "-" "Mozilla/5.0"
+
+2026-09-21T08:50:12+08:00 WARN  app01 nginx[2148]: 203.0.113.88 - - "GET /admin/config HTTP/1.1" 403 421 "-" "security-test-client/1.0"
+2026-09-21T08:50:14+08:00 WARN  app01 nginx[2148]: 203.0.113.88 - - "GET /internal/status HTTP/1.1" 403 421 "-" "security-test-client/1.0"
+2026-09-21T08:50:16+08:00 WARN  app01 security[5312]: access_control_denied src_ip=203.0.113.88 count=2 action=logged
+
+2026-09-21T08:50:31+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET / HTTP/1.1" 200 4218 "-" "Mozilla/5.0"
+2026-09-21T08:50:47+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /dashboard HTTP/1.1" 200 8421 "-" "Mozilla/5.0"
+2026-09-21T08:51:03+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /dashboard HTTP/1.1" 200 8418 "-" "Mozilla/5.0"
+2026-09-21T08:51:19+08:00 INFO  app01 app[5312]: dashboard_load user_id=10882 widgets=8 result=success
+2026-09-21T08:51:35+08:00 INFO  app01 app[5312]: scheduled_job job=refresh_cache status=completed duration_ms=211
+2026-09-21T08:51:51+08:00 INFO  app01 app[5312]: scheduled_job job=cleanup_sessions status=completed duration_ms=119
+2026-09-21T08:52:07+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /logout HTTP/1.1" 302 512 "-" "Mozilla/5.0"
+2026-09-21T08:52:08+08:00 INFO  app01 auth[5312]: user_logout user_id=10428 src_ip=192.0.2.41 result=success
+2026-09-21T08:52:23+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /login HTTP/1.1" 200 5231 "-" "Mozilla/5.0"
+2026-09-21T08:52:39+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "POST /login HTTP/1.1" 302 812 "-" "Mozilla/5.0"
+2026-09-21T08:52:40+08:00 INFO  app01 auth[5312]: user_login user_id=10882 src_ip=203.0.113.31 result=success
+2026-09-21T08:52:56+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /dashboard HTTP/1.1" 200 8418 "-" "Mozilla/5.0"
+2026-09-21T08:53:11+08:00 INFO  app01 app[5312]: dashboard_load user_id=10882 widgets=8 result=success
+2026-09-21T08:53:27+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /products HTTP/1.1" 200 9127 "-" "Mozilla/5.0"
+2026-09-21T08:53:43+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /products/1001 HTTP/1.1" 200 6281 "-" "Mozilla/5.0"
+2026-09-21T08:53:59+08:00 INFO  app01 app[5312]: product_view user_id=10428 product_id=1001 result=success
+2026-09-21T08:54:15+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /api/notifications HTTP/1.1" 200 2811 "-" "Mozilla/5.0"
+2026-09-21T08:54:31+08:00 INFO  app01 app[5312]: notification_read user_id=10428 notification_id=923 result=success
+2026-09-21T08:54:47+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /help/security HTTP/1.1" 200 3812 "-" "Mozilla/5.0"
+2026-09-21T08:55:03+08:00 INFO  app01 app[5312]: support_article_view user_id=10882 article_id=58 result=success
+2026-09-21T08:55:19+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /account/security HTTP/1.1" 200 5122 "-" "Mozilla/5.0"
+2026-09-21T08:55:35+08:00 INFO  app01 app[5312]: audit action=view_security_settings user_id=10428 result=success
+2026-09-21T08:55:51+08:00 INFO  app01 app[5312]: health_check service=database status=healthy latency_ms=8
+2026-09-21T08:56:07+08:00 INFO  app01 app[5312]: health_check service=cache status=healthy latency_ms=3
+2026-09-21T08:56:23+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET / HTTP/1.1" 200 4218 "-" "Mozilla/5.0"
+2026-09-21T08:56:39+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /news HTTP/1.1" 200 5821 "-" "Mozilla/5.0"
+2026-09-21T08:56:55+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /orders HTTP/1.1" 200 7318 "-" "Mozilla/5.0"
+2026-09-21T08:57:11+08:00 INFO  app01 app[5312]: order_query user_id=10428 count=3 result=success
+2026-09-21T08:57:27+08:00 INFO  app01 nginx[2148]: 203.0.113.17 - - "GET /settings HTTP/1.1" 200 4818 "-" "Mozilla/5.0"
+2026-09-21T08:57:43+08:00 INFO  app01 app[5312]: settings_read user_id=10882 result=success
+2026-09-21T08:57:59+08:00 INFO  app01 nginx[2148]: 192.0.2.41 - - "GET /support HTTP/1.1" 200 3918 "-" "Mozilla/5.0"
+2026-09-21T08:58:15+08:00 INFO  app01 app[5312]: support_article_view user_id=10428 article_id=61 result=success
+2026-09-21T08:58:31+08:00 INFO  app01 nginx[2148]: 203.0.113.31 - - "GET /api/activity HTTP/1.1" 200 3921 "-" "Mozilla/5.0"
+2026-09-21T08:58:47+08:00 INFO  app01 app[5312]: activity_query user_id=10882 count=9 result=success
+2026-09-21T08:59:03+08:00 INFO  app01 nginx[2148]: 198.51.100.23 - - "GET /profile HTTP/1.1" 200 4812 "-" "Mozilla/5.0"
+2026-09-21T08:59:19+08:00 INFO  app01 app[5312]: profile_read user_id=10428 result=success
+2026-09-21T08:59:35+08:00 INFO  app01 app[5312]: scheduled_job job=cleanup_sessions status=completed duration_ms=125
+2026-09-21T08:59:51+08:00 INFO  app01 app[5312]: scheduled_job job=refresh_cache status=completed duration_ms=207
+2026-09-21T09:00:00+08:00 INFO  app01 app[5312]: daily_summary requests=1842 errors=7 warnings=9 blocked_requests=7 status=healthy

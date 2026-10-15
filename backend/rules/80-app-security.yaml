@@ -1,0 +1,94 @@
+# 应用层安全日志规则：匹配「应用程序自己记录的安全信号」
+#
+# 这类消息通常出现在 syslog / 容器日志前缀的内层（程序名为 security），
+# 是业务侧已经做出的判定，属于高信号输入——日志侧直接采信并给出提示，
+# 而不是用日志内容重新推断一遍，避免与业务侧结论互相矛盾。
+#
+# 匹配依据是消息动词（如 suspicious_path_sequence），用 raw 匹配：
+# 这些动词只出现在安全程序日志里，不会与「用户访问了某路径」混淆。
+# 聚合沿用 Web 规则的 bucket 模式：同一来源只出一条，避免刷屏。
+
+source: builtin
+
+# 文档级元数据：本文件内全部规则共用；规则级声明优先（见 rules_engine.build_rule）。
+metadata:
+  author: AI-LogInsight
+  version: "1.0"
+  license: proprietary
+  validation_status: validated
+
+rules:
+  - id: app.sensitive_path_probe
+    title: 应用层敏感路径探测
+    description: 应用自身记录了敏感路径探测序列，说明业务侧已识别出扫描行为。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [syslog]
+    enabled_env: RULE_APP_SENSITIVE_PATH_PROBE_ENABLED
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: raw, op: exists}
+      any:
+        - - field: raw
+            op: any_contains
+            values: ["suspicious_path_sequence"]
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: app_sensitive_path_probe
+      name: 应用层敏感路径探测
+      level: medium
+      summary: "应用日志记录来源 {ip} 出现敏感路径探测序列（{count} 次），业务侧已识别该行为，需核实访问来源是否符合业务预期。"
+
+  - id: app.auth_threshold_block
+    title: 应用层认证阈值触发封禁
+    description: 应用因同一来源认证失败达到阈值而临时封禁，说明该来源发生了认证攻击且已被应用侧拦下。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [syslog]
+    enabled_env: RULE_APP_AUTH_THRESHOLD_BLOCK_ENABLED
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: raw, op: exists}
+      any:
+        - - field: raw
+            op: any_contains
+            values: ["temporary_block"]
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: app_auth_threshold_block
+      name: 应用层认证阈值触发封禁
+      level: medium
+      summary: "应用日志记录来源 {ip} 因认证失败达到阈值被临时封禁（{count} 次），说明该来源发生过认证攻击，需确认封禁是否生效、是否有其他来源参与。"
+
+  - id: app.restricted_resource_access
+    title: 应用层受限资源访问
+    description: 应用记录了受限资源被访问并拦截，属于越权或探测尝试。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [syslog]
+    enabled_env: RULE_APP_RESTRICTED_RESOURCE_ACCESS_ENABLED
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: raw, op: exists}
+      any:
+        - - field: raw
+            op: any_contains
+            values: ["restricted_resource_access"]
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: app_restricted_resource_access
+      name: 应用层受限资源访问
+      level: medium
+      summary: "应用日志记录来源 {ip} 访问受限资源被拦截（{count} 次），需结合资源用途判断是否为越权探测。"

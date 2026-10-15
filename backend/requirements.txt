@@ -1,0 +1,14 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic==2.10.6
+pytest==8.3.4
+httpx==0.28.1
+python-evtx==0.8.1
+drain3==0.9.11
+# 规则与语料的 YAML 解析（rules_engine / sigma_import / rule_quality 等直接 import yaml）。
+# uvicorn[standard] 会顺带装上它，但本项目直接 import，显式声明避免换掉 extras 时静默失败。
+pyyaml==6.0.3
+# MCP 只读接口（scripts/mcp_server.py）。必须锁 1.9.x：
+# mcp>=1.30 会把 pydantic 拉到 >=2.12、starlette 拉到 1.x，与 fastapi 0.115.6 不兼容。
+mcp==1.9.4

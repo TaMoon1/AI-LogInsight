@@ -1,0 +1,268 @@
+# 认证类规则：SSH 与通用结构化认证事件
+#
+# 声明式字段说明（完整规范见 README「规则声明式表达」）：
+#   detection.where   记录必须全部满足的条件（AND）
+#   detection.any     任一子条件组成立即可（OR of AND）
+#   aggregate         时间窗聚合；distinct_field 用于「多目标」类规则
+#   follow_up         在窗口之后关联另一类记录（失败聚集 → 成功登录）
+#   suppresses        命中后压制其他规则，避免同一行为重复告警
+#   upgrade_rule      被该规则升级；其启用状态决定基础规则的措辞
+#   event.notes       按 follow_up 状态选择文案（none / found / downgraded）
+
+source: builtin
+
+# 文档级元数据：本文件内全部规则共用；规则级声明优先（见 rules_engine.build_rule）。
+# validation_status=validated 的依据是标注语料覆盖（evaluation/corpus），
+# 不是自我声明——证据口径见 scripts/eval_rules.py 的输出。
+metadata:
+  author: AI-LogInsight
+  version: "1.0"
+  license: proprietary
+  validation_status: validated
+
+rules:
+  - id: ssh.bruteforce.success
+    title: 失败认证后成功登录
+    description: 同一来源 IP 在时间窗口内出现大量认证失败，随后出现成功登录。
+    level: high
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [ssh, generic]
+    enabled_env: RULE_SSH_BRUTEFORCE_SUCCESS_ENABLED
+    threshold: 20
+    threshold_env: SSH_FAILURE_THRESHOLD
+    window_seconds: 300
+    window_env: SSH_FAILURE_WINDOW_SECONDS
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: action, op: equals, value: login}
+        - {field: result, op: equals, value: failure}
+      aggregate:
+        group_by: [source_ip]
+        count_gte: 20
+        window_seconds: 300
+        follow_up:
+          where:
+            - {field: result, op: equals, value: success}
+          within_seconds: 1800
+    suppresses: [ssh.bruteforce]
+    event:
+      type: ssh_bruteforce_success
+      name: 失败认证后出现成功登录
+      level: high
+      summary: "{ip} 在 5 分钟内出现 {count} 次认证失败，{rdp_hint}涉及 {accounts} 个账户，随后出现 {success_count} 次成功登录。"
+      time: follow_up_end
+      evidence: window_follow_up
+      evidence_head: 3
+      follow_up_head: 2
+
+  - id: ssh.bruteforce
+    title: SSH 暴力破解候选
+    description: 同一来源 IP 在时间窗口内出现大量认证失败。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [ssh, generic]
+    enabled_env: RULE_SSH_BRUTEFORCE_ENABLED
+    threshold: 20
+    threshold_env: SSH_FAILURE_THRESHOLD
+    window_seconds: 300
+    window_env: SSH_FAILURE_WINDOW_SECONDS
+    upgrade_rule: ssh.bruteforce.success
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: action, op: equals, value: login}
+        - {field: result, op: equals, value: failure}
+      aggregate:
+        group_by: [source_ip]
+        count_gte: 20
+        window_seconds: 300
+        follow_up:
+          where:
+            - {field: result, op: equals, value: success}
+          within_seconds: 1800
+    event:
+      type: ssh_bruteforce
+      name: 疑似 SSH 暴力破解
+      level: medium
+      summary: "{ip} 在 5 分钟内出现 {count} 次认证失败，涉及 {accounts} 个账户{success_note}"
+      time: follow_up_end
+      evidence: window_follow_up
+      evidence_head: 3
+      follow_up_head: 2
+      notes:
+        success_note:
+          none: "，暂未发现随后成功登录。"
+          downgraded: "，失败后成功登录规则当前已关闭。"
+          found: "，随后出现 {success_count} 次成功登录。"
+
+  - id: ssh.password_spray
+    title: SSH 密码喷洒候选
+    description: 同一来源 IP 在短时间内对多个 SSH 账户发起失败认证，符合低频密码喷洒特征。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [ssh, generic]
+    enabled_env: RULE_SSH_PASSWORD_SPRAY_ENABLED
+    threshold: 8
+    threshold_env: SSH_PASSWORD_SPRAY_THRESHOLD
+    window_seconds: 600
+    window_env: SSH_PASSWORD_SPRAY_WINDOW_SECONDS
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: username, op: exists}
+        - {field: action, op: equals, value: login}
+        - {field: result, op: equals, value: failure}
+      aggregate:
+        group_by: [source_ip]
+        count_gte: 8
+        distinct_field: username
+        distinct_gte: 5
+        window_seconds: 600
+    event:
+      type: ssh_password_spray
+      name: 疑似 SSH 密码喷洒
+      level: medium
+      summary: "{ip} 在 {window} 秒内对 {accounts} 个账户发起 {count} 次失败认证，符合密码喷洒特征，需核实来源地址与账户范围。"
+      evidence: window_head
+      evidence_head: 5
+
+  - id: ssh.privileged_login
+    title: SSH 高权限账户登录
+    description: 检测 root 等高权限账户的 SSH 成功登录。
+    level: medium
+    logsource:
+      exclude_log_types: [json, csv, mysql, postgresql, mongodb, redis]
+      display_log_types: [ssh, generic]
+    enabled_env: RULE_SSH_PRIVILEGED_LOGIN_ENABLED
+    detection:
+      where:
+        - {field: action, op: equals, value: login}
+        - {field: result, op: equals, value: success}
+        - {field: username, op: in_set, values: [root, administrator, admin]}
+      aggregate:
+        group_by:
+          - source_ip
+          - target_asset
+          - username
+          - action
+        bucket: true
+    event:
+      type: privileged_login
+      name: 高权限账户成功登录
+      level: medium
+      summary: "日志显示来源 {ip} 成功登录高权限账户 {username}{logon_hint}，共 {count} 次，需核实是否为预期运维行为。"
+      evidence: window_head
+      evidence_head: 10
+
+  - id: auth.bruteforce.success
+    title: 认证失败聚集后成功登录
+    description: 通用结构化日志（VPN、堡垒机、应用系统）中出现认证失败聚集并随后成功登录。
+    level: high
+    logsource:
+      log_types: [json, csv]
+      display_log_types: [json, csv]
+    enabled_env: RULE_AUTH_BRUTEFORCE_SUCCESS_ENABLED
+    threshold: 20
+    threshold_env: AUTH_FAILURE_THRESHOLD
+    window_seconds: 300
+    window_env: AUTH_FAILURE_WINDOW_SECONDS
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: action, op: in_set, values: [login, logon]}
+        - {field: result, op: equals, value: failure}
+      aggregate:
+        group_by: [source_ip]
+        count_gte: 20
+        window_seconds: 300
+        follow_up:
+          where:
+            - {field: result, op: equals, value: success}
+          within_seconds: 1800
+    suppresses: [auth.bruteforce]
+    event:
+      type: auth_bruteforce_success
+      name: 认证失败聚集后出现成功登录
+      level: high
+      summary: "{ip} 在 5 分钟内出现 {count} 次认证失败，涉及 {accounts} 个账户，随后出现 {success_count} 次成功登录。"
+      time: follow_up_end
+      evidence: window_follow_up
+      evidence_head: 3
+      follow_up_head: 2
+
+  - id: auth.bruteforce
+    title: 认证暴力破解候选
+    description: 通用结构化日志中同一来源 IP 在时间窗口内出现大量认证失败。
+    level: medium
+    logsource:
+      log_types: [json, csv]
+      display_log_types: [json, csv]
+    enabled_env: RULE_AUTH_BRUTEFORCE_ENABLED
+    threshold: 20
+    threshold_env: AUTH_FAILURE_THRESHOLD
+    window_seconds: 300
+    window_env: AUTH_FAILURE_WINDOW_SECONDS
+    upgrade_rule: auth.bruteforce.success
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: action, op: in_set, values: [login, logon]}
+        - {field: result, op: equals, value: failure}
+      aggregate:
+        group_by: [source_ip]
+        count_gte: 20
+        window_seconds: 300
+        follow_up:
+          where:
+            - {field: result, op: equals, value: success}
+          within_seconds: 1800
+    event:
+      type: auth_bruteforce
+      name: 疑似认证暴力破解
+      level: medium
+      summary: "{ip} 在 5 分钟内出现 {count} 次认证失败，涉及 {accounts} 个账户{success_note}"
+      time: follow_up_end
+      evidence: window_follow_up
+      evidence_head: 3
+      follow_up_head: 2
+      notes:
+        success_note:
+          none: "，暂未发现随后成功登录。"
+          downgraded: "，失败后成功登录规则当前已关闭。"
+          found: "，随后出现 {success_count} 次成功登录。"
+
+  - id: auth.password_spray
+    title: 结构化认证密码喷洒候选
+    description: VPN、堡垒机、应用系统等结构化认证日志中，同一来源 IP 在短时间内对多个账户发起失败认证。
+    level: medium
+    logsource:
+      log_types: [json, csv]
+      display_log_types: [json, csv]
+    enabled_env: RULE_AUTH_PASSWORD_SPRAY_ENABLED
+    threshold: 8
+    threshold_env: AUTH_PASSWORD_SPRAY_THRESHOLD
+    window_seconds: 600
+    window_env: AUTH_PASSWORD_SPRAY_WINDOW_SECONDS
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: username, op: exists}
+        - {field: action, op: in_set, values: [login, logon]}
+        - {field: result, op: equals, value: failure}
+      aggregate:
+        group_by: [source_ip]
+        count_gte: 8
+        distinct_field: username
+        distinct_gte: 5
+        window_seconds: 600
+    event:
+      type: auth_password_spray
+      name: 疑似认证密码喷洒
+      level: medium
+      summary: "{ip} 在 {window} 秒内对 {accounts} 个账户发起 {count} 次失败认证，符合密码喷洒特征，需核实是否为共享出口或正常批量测试。"
+      evidence: window_head
+      evidence_head: 5

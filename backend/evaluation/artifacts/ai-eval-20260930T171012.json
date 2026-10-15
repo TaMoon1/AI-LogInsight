@@ -1,0 +1,318 @@
+{
+  "generated_at": "2026-09-30T17:10:12",
+  "runs": [
+    {
+      "label": "deepseek/deepseek-chat + 内置 SYSTEM_PROMPT",
+      "conditions": {
+        "判据": "确定性替身（把规则结论换个措辞）——**不是真实模型评测**，通过只说明检查器与管线自洽，不代表模型判得准",
+        "规则集": "内置规则 + Sigma 社区规则",
+        "用例范围": "最小回归集（5 条，标记 smoke: true）",
+        "模型": "deepseek/deepseek-chat",
+        "Prompt": "内置 SYSTEM_PROMPT"
+      },
+      "summary": {
+        "total": 5,
+        "passed": 5,
+        "gate_failed": false,
+        "mean_confidence": 0.44,
+        "mean_behaviors": 0.6,
+        "citation_coverage": 1.0,
+        "tokens": 750,
+        "billed_cases": 5,
+        "duration_ms": 841.17,
+        "confusion": {
+          "tp": 2,
+          "fp": 0,
+          "tn": 3,
+          "fn": 0
+        },
+        "accuracy": 1.0,
+        "false_positive_rate": 0.0,
+        "false_negative_rate": 0.0,
+        "estimated_cost": null,
+        "gate_metrics": {
+          "accuracy": 1.0,
+          "false_positive_rate": 0.0,
+          "tokens_total": 750.0,
+          "tokens_first_round": null,
+          "context_bytes": 26515.0,
+          "evidence_sent": 6.0
+        }
+      },
+      "cases": [
+        {
+          "name": "normal-health-check",
+          "family": "核心研判（正常 / 异常 / 证据不足 / 多事件 / 误报）",
+          "passed": true,
+          "risk_level": "info",
+          "confidence": 0.2,
+          "behavior_count": 0,
+          "citation_coverage": null,
+          "duration_ms": 161.78,
+          "usage": {
+            "rounds": 1,
+            "prompt_tokens": 100,
+            "completion_tokens": 50
+          },
+          "metrics": {
+            "duration_ms": 160.1,
+            "rounds": 1,
+            "tokens": {
+              "total": 150,
+              "first_round": null,
+              "tool_rounds": null,
+              "cache_hit": null
+            },
+            "context": {
+              "bytes": 3238,
+              "estimated_input_tokens": 1619,
+              "evidence_available": 0,
+              "evidence_sent": 0,
+              "evidence_truncation_rate": null,
+              "event_tokens": [],
+              "evidence_tokens": {}
+            },
+            "evidence": {
+              "referenced": [],
+              "coverage": null,
+              "omission_rate": null
+            },
+            "cost": {
+              "estimated": null,
+              "note": "未配置单价，成本不可估算（设置 AI_PRICE_INPUT_PER_M / AI_PRICE_OUTPUT_PER_M 后可见）"
+            }
+          },
+          "evidence_refs": [],
+          "dropped_evidence_ids": [],
+          "gating_failures": []
+        },
+        {
+          "name": "obvious-sensitive-path",
+          "family": "核心研判（正常 / 异常 / 证据不足 / 多事件 / 误报）",
+          "passed": true,
+          "risk_level": "medium",
+          "confidence": 0.8,
+          "behavior_count": 1,
+          "citation_coverage": 1.0,
+          "duration_ms": 166.55,
+          "usage": {
+            "rounds": 1,
+            "prompt_tokens": 100,
+            "completion_tokens": 50
+          },
+          "metrics": {
+            "duration_ms": 164.8,
+            "rounds": 1,
+            "tokens": {
+              "total": 150,
+              "first_round": null,
+              "tool_rounds": null,
+              "cache_hit": null
+            },
+            "context": {
+              "bytes": 4301,
+              "estimated_input_tokens": 2151,
+              "evidence_available": 1,
+              "evidence_sent": 1,
+              "evidence_truncation_rate": 0.0,
+              "event_tokens": [
+                {
+                  "index": 0,
+                  "name": "敏感路径探测",
+                  "risk_level": "medium",
+                  "tokens": 487
+                }
+              ],
+              "evidence_tokens": {
+                "evidence-sensitive_path_access-1": 166
+              }
+            },
+            "evidence": {
+              "referenced": [
+                "evidence-sensitive_path_access-1"
+              ],
+              "coverage": 1.0,
+              "omission_rate": 0.0
+            },
+            "cost": {
+              "estimated": null,
+              "note": "未配置单价，成本不可估算（设置 AI_PRICE_INPUT_PER_M / AI_PRICE_OUTPUT_PER_M 后可见）"
+            }
+          },
+          "evidence_refs": [
+            "evidence-sensitive_path_access-1"
+          ],
+          "dropped_evidence_ids": [],
+          "gating_failures": []
+        },
+        {
+          "name": "insufficient-evidence",
+          "family": "核心研判（正常 / 异常 / 证据不足 / 多事件 / 误报）",
+          "passed": true,
+          "risk_level": "info",
+          "confidence": 0.2,
+          "behavior_count": 0,
+          "citation_coverage": null,
+          "duration_ms": 179.33,
+          "usage": {
+            "rounds": 1,
+            "prompt_tokens": 100,
+            "completion_tokens": 50
+          },
+          "metrics": {
+            "duration_ms": 177.8,
+            "rounds": 1,
+            "tokens": {
+              "total": 150,
+              "first_round": null,
+              "tool_rounds": null,
+              "cache_hit": null
+            },
+            "context": {
+              "bytes": 2525,
+              "estimated_input_tokens": 1263,
+              "evidence_available": 0,
+              "evidence_sent": 0,
+              "evidence_truncation_rate": null,
+              "event_tokens": [],
+              "evidence_tokens": {}
+            },
+            "evidence": {
+              "referenced": [],
+              "coverage": null,
+              "omission_rate": null
+            },
+            "cost": {
+              "estimated": null,
+              "note": "未配置单价，成本不可估算（设置 AI_PRICE_INPUT_PER_M / AI_PRICE_OUTPUT_PER_M 后可见）"
+            }
+          },
+          "evidence_refs": [],
+          "dropped_evidence_ids": [],
+          "gating_failures": []
+        },
+        {
+          "name": "correlated-failures-then-success",
+          "family": "核心研判（正常 / 异常 / 证据不足 / 多事件 / 误报）",
+          "passed": true,
+          "risk_level": "high",
+          "confidence": 0.8,
+          "behavior_count": 2,
+          "citation_coverage": 1.0,
+          "duration_ms": 168.72,
+          "usage": {
+            "rounds": 1,
+            "prompt_tokens": 100,
+            "completion_tokens": 50
+          },
+          "metrics": {
+            "duration_ms": 166.8,
+            "rounds": 1,
+            "tokens": {
+              "total": 150,
+              "first_round": null,
+              "tool_rounds": null,
+              "cache_hit": null
+            },
+            "context": {
+              "bytes": 13810,
+              "estimated_input_tokens": 6905,
+              "evidence_available": 5,
+              "evidence_sent": 5,
+              "evidence_truncation_rate": 0.0,
+              "event_tokens": [
+                {
+                  "index": 0,
+                  "name": "失败认证后出现成功登录",
+                  "risk_level": "high",
+                  "tokens": 1139
+                },
+                {
+                  "index": 1,
+                  "name": "高权限账户成功登录",
+                  "risk_level": "medium",
+                  "tokens": 478
+                }
+              ],
+              "evidence_tokens": {
+                "evidence-ssh_bruteforce_success-1": 156,
+                "evidence-ssh_bruteforce_success-2": 156,
+                "evidence-ssh_bruteforce_success-3": 156,
+                "evidence-ssh_bruteforce_success-4": 158,
+                "evidence-privileged_login-1": 155
+              }
+            },
+            "evidence": {
+              "referenced": [
+                "evidence-ssh_bruteforce_success-1",
+                "evidence-ssh_bruteforce_success-2",
+                "evidence-ssh_bruteforce_success-3",
+                "evidence-privileged_login-1"
+              ],
+              "coverage": 0.8,
+              "omission_rate": 0.2
+            },
+            "cost": {
+              "estimated": null,
+              "note": "未配置单价，成本不可估算（设置 AI_PRICE_INPUT_PER_M / AI_PRICE_OUTPUT_PER_M 后可见）"
+            }
+          },
+          "evidence_refs": [
+            "evidence-ssh_bruteforce_success-1",
+            "evidence-ssh_bruteforce_success-2",
+            "evidence-ssh_bruteforce_success-3",
+            "evidence-privileged_login-1"
+          ],
+          "dropped_evidence_ids": [],
+          "gating_failures": []
+        },
+        {
+          "name": "truncated-mid-line",
+          "family": "边界与退化输入（无时间戳 / 字段缺失 / 截断）",
+          "passed": true,
+          "risk_level": "info",
+          "confidence": 0.2,
+          "behavior_count": 0,
+          "citation_coverage": null,
+          "duration_ms": 164.79,
+          "usage": {
+            "rounds": 1,
+            "prompt_tokens": 100,
+            "completion_tokens": 50
+          },
+          "metrics": {
+            "duration_ms": 163.0,
+            "rounds": 1,
+            "tokens": {
+              "total": 150,
+              "first_round": null,
+              "tool_rounds": null,
+              "cache_hit": null
+            },
+            "context": {
+              "bytes": 2641,
+              "estimated_input_tokens": 1321,
+              "evidence_available": 0,
+              "evidence_sent": 0,
+              "evidence_truncation_rate": null,
+              "event_tokens": [],
+              "evidence_tokens": {}
+            },
+            "evidence": {
+              "referenced": [],
+              "coverage": null,
+              "omission_rate": null
+            },
+            "cost": {
+              "estimated": null,
+              "note": "未配置单价，成本不可估算（设置 AI_PRICE_INPUT_PER_M / AI_PRICE_OUTPUT_PER_M 后可见）"
+            }
+          },
+          "evidence_refs": [],
+          "dropped_evidence_ids": [],
+          "gating_failures": []
+        }
+      ]
+    }
+  ]
+}

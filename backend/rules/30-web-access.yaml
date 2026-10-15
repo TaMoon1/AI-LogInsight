@@ -1,0 +1,173 @@
+# Web 访问日志规则：敏感路径、路径遍历、404 扫描、5xx 聚集
+#
+# log_types 留空表示「不限日志类型」：只要解析出 url / status 的记录都参与判定，
+# 因此通用文本日志、CSV / JSON 导出的 Web 事件同样受这些规则保护。
+
+source: builtin
+
+# 文档级元数据：本文件内全部规则共用；规则级声明优先（见 rules_engine.build_rule）。
+metadata:
+  author: AI-LogInsight
+  version: "1.0"
+  license: proprietary
+  validation_status: validated
+
+rules:
+  - id: web.sensitive_path
+    title: 敏感路径探测
+    description: 请求 .git、.env、后台或系统敏感路径。
+    level: medium
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_SENSITIVE_PATH_ENABLED
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: url, op: exists}
+      any:
+        - - {field: url, op: any_path_prefix, transform: url_path, values: ["/.git", "/etc/passwd", "/wp-admin", "/phpmyadmin", "/.env"]}
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: sensitive_path_access
+      name: 敏感路径探测
+      level: medium
+      summary: "{ip} 请求了敏感路径 {sample}（{count} 次），需结合业务场景核实。"
+
+  - id: web.path_traversal
+    title: 路径遍历候选
+    description: 请求 URL 出现路径遍历编码或目录跳转特征。
+    level: high
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_PATH_TRAVERSAL_ENABLED
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: url, op: exists}
+      any:
+        - - {field: url, op: any_contains, transform: url_decode, values: ["../", "..%2f", "%2e%2e", "%252e"]}
+        - - {field: url, op: any_contains, transform: lower, values: ["../", "..%2f", "%2e%2e", "%252e"]}
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: path_traversal_candidate
+      name: 疑似路径遍历
+      level: high
+      summary: "{ip} 的请求 URL 包含路径遍历特征 {sample}（{count} 次）。"
+
+  - id: web.sensitive_file_access.success
+    title: 敏感文件成功读取
+    description: 请求敏感文件路径并返回 2xx，疑似私钥、云凭证或运维配置文件已被成功读取。
+    level: high
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_SENSITIVE_FILE_SUCCESS_ENABLED
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: url, op: exists}
+        - {field: status, op: startswith, value: "2"}
+      any:
+        - - field: url
+            op: any_contains
+            transform: url_decode
+            values: [id_rsa, id_ed25519, ".ssh/", ".aws/credentials", "wp-config.php", "web.config", ".htpasswd", ".npmrc", "kubeconfig", "backup.sql", ".bash_history", ".netrc"]
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    suppresses: [web.sensitive_file_access]
+    event:
+      type: sensitive_file_success
+      name: 疑似敏感文件被成功读取
+      level: high
+      summary: "{ip} 读取敏感文件路径 {sample} 返回 {statuses}（{count} 次），疑似私钥或凭证已泄露，需立即核实该路径是否存在并评估影响。"
+
+  - id: web.sensitive_file_access
+    title: 敏感文件路径探测
+    description: 请求 SSH 私钥、云凭证、运维配置或备份文件等敏感文件路径（`.git` 前缀由 sensitive_path 规则覆盖，此处不重复）。
+    level: medium
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_SENSITIVE_FILE_ACCESS_ENABLED
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: url, op: exists}
+      any:
+        - - field: url
+            op: any_contains
+            transform: url_decode
+            values: [id_rsa, id_ed25519, ".ssh/", ".aws/credentials", "wp-config.php", "web.config", ".htpasswd", ".npmrc", "kubeconfig", "backup.sql", ".bash_history", ".netrc"]
+      aggregate:
+        group_by: [source_ip]
+        bucket: true
+    event:
+      type: sensitive_file_access
+      name: 敏感文件路径探测
+      level: medium
+      summary: "{ip} 请求敏感文件路径 {sample}（{count} 次），需核实该路径是否为业务正常访问。"
+
+  - id: web.404_scan
+    title: Web 路径扫描候选
+    description: 同一来源 IP 在时间窗口内产生大量 HTTP 404。
+    level: medium
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_404_SCAN_ENABLED
+    threshold: 20
+    threshold_env: WEB_404_THRESHOLD
+    window_seconds: 300
+    window_env: WEB_404_WINDOW_SECONDS
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: url, op: exists}
+        - {field: status, op: equals, value: "404"}
+      aggregate:
+        group_by: [source_ip]
+        count_gte: 20
+        window_seconds: 300
+    event:
+      type: web_scan_candidate
+      name: 疑似 Web 路径扫描
+      level: medium
+      summary: "{ip} 在 {window} 秒内产生 {count} 次 HTTP 404 响应，可能存在路径枚举或扫描行为，需核实。"
+      evidence: window_head
+      evidence_head: 10
+
+  - id: web.5xx_burst
+    title: Web 服务端错误聚集
+    description: 同一来源 IP 在时间窗口内产生大量 HTTP 5xx 响应。
+    level: medium
+    logsource:
+      exclude_log_types: [mysql, postgresql, mongodb, redis]
+      display_log_types: [nginx_apache, iis, json, csv]
+    enabled_env: RULE_WEB_5XX_BURST_ENABLED
+    threshold: 5
+    threshold_env: WEB_5XX_THRESHOLD
+    window_seconds: 300
+    window_env: WEB_5XX_WINDOW_SECONDS
+    detection:
+      where:
+        - {field: source_ip, op: exists}
+        - {field: url, op: exists}
+        - {field: status, op: startswith, value: "5"}
+      aggregate:
+        group_by: [source_ip]
+        count_gte: 5
+        window_seconds: 300
+    event:
+      type: web_server_error_burst
+      name: Web 服务端错误聚集
+      level: medium
+      summary: "{ip} 在 {window} 秒内产生 {count} 次 HTTP 5xx 响应（状态码 {statuses}），可能是应用故障，也可能由异常请求触发，需结合应用日志核实。"
+      evidence: window_head
+      evidence_head: 10

@@ -1,0 +1,33 @@
+2026-09-16 09:01:02,101 INFO  [http-nio-8080-exec-1] c.e.order.OrderService - 订单创建成功 orderId=SO202609160011 amount=128.50
+2026-09-16 09:01:03,204 INFO  [http-nio-8080-exec-2] c.e.order.OrderService - 订单创建成功 orderId=SO202609160012 amount=59.00
+2026-09-16 09:01:04,318 INFO  [http-nio-8080-exec-3] c.e.order.OrderService - 订单创建成功 orderId=SO202609160013 amount=1042.00
+2026-09-16 09:01:06,422 INFO  [http-nio-8080-exec-4] c.e.order.OrderService - 订单创建成功 orderId=SO202609160014 amount=18.90
+2026-09-16 09:01:07,555 INFO  [http-nio-8080-exec-5] c.e.order.OrderService - 订单创建成功 orderId=SO202609160015 amount=376.00
+2026-09-16 09:01:09,671 INFO  [http-nio-8080-exec-6] c.e.order.OrderService - 订单创建成功 orderId=SO202609160016 amount=88.80
+2026-09-16 09:01:11,742 INFO  [http-nio-8080-exec-7] c.e.order.OrderService - 订单创建成功 orderId=SO202609160017 amount=250.00
+2026-09-16 09:01:13,809 INFO  [http-nio-8080-exec-8] c.e.order.OrderService - 订单创建成功 orderId=SO202609160018 amount=66.60
+2026-09-16 09:01:15,930 INFO  [http-nio-8080-exec-9] c.e.order.OrderService - 订单创建成功 orderId=SO202609160019 amount=512.30
+2026-09-16 09:01:18,014 INFO  [http-nio-8080-exec-10] c.e.order.OrderService - 订单创建成功 orderId=SO202609160020 amount=99.99
+2026-09-16 09:01:20,155 INFO  [http-nio-8080-exec-11] c.e.order.OrderService - 订单创建成功 orderId=SO202609160021 amount=777.00
+2026-09-16 09:01:22,266 INFO  [http-nio-8080-exec-12] c.e.order.OrderService - 订单创建成功 orderId=SO202609160022 amount=31.20
+2026-09-16 09:02:01,310 WARN  [http-nio-8080-exec-2] c.e.inventory.StockService - 库存扣减失败 sku=SKU100238 retry=1
+2026-09-16 09:02:02,405 WARN  [http-nio-8080-exec-3] c.e.inventory.StockService - 库存扣减失败 sku=SKU100271 retry=1
+2026-09-16 09:02:03,512 WARN  [http-nio-8080-exec-4] c.e.inventory.StockService - 库存扣减失败 sku=SKU100294 retry=2
+2026-09-16 09:02:05,688 WARN  [http-nio-8080-exec-5] c.e.inventory.StockService - 库存扣减失败 sku=SKU100238 retry=2
+2026-09-16 09:02:07,733 WARN  [http-nio-8080-exec-6] c.e.inventory.StockService - 库存扣减失败 sku=SKU100310 retry=1
+2026-09-16 09:02:09,845 WARN  [http-nio-8080-exec-7] c.e.inventory.StockService - 库存扣减失败 sku=SKU100311 retry=3
+2026-09-16 09:02:11,961 WARN  [http-nio-8080-exec-8] c.e.inventory.StockService - 库存扣减失败 sku=SKU100322 retry=1
+2026-09-16 09:02:14,077 WARN  [http-nio-8080-exec-9] c.e.inventory.StockService - 库存扣减失败 sku=SKU100333 retry=2
+2026-09-16 09:03:00,120 ERROR [http-nio-8080-exec-1] c.e.common.DataSourceHealth - 数据源连接超时 cost=5032ms
+2026-09-16 09:03:31,401 ERROR [http-nio-8080-exec-2] c.e.common.DataSourceHealth - 数据源连接超时 cost=5018ms
+2026-09-16 09:04:02,553 ERROR [http-nio-8080-exec-3] c.e.common.DataSourceHealth - 数据源连接超时 cost=5104ms
+2026-09-16 09:04:33,690 ERROR [http-nio-8080-exec-4] c.e.common.DataSourceHealth - 数据源连接超时 cost=5009ms
+2026-09-16 09:05:04,812 ERROR [http-nio-8080-exec-5] c.e.common.DataSourceHealth - 数据源连接超时 cost=5240ms
+2026-09-16 09:05:35,975 ERROR [http-nio-8080-exec-6] c.e.common.DataSourceHealth - 数据源连接超时 cost=5088ms
+2026-09-16 09:06:10,101 INFO  [http-nio-8080-exec-7] c.e.cache.LocalCache - 缓存未命中 key=user:88213
+2026-09-16 09:06:41,233 INFO  [http-nio-8080-exec-8] c.e.cache.LocalCache - 缓存未命中 key=user:88240
+2026-09-16 09:07:12,355 INFO  [http-nio-8080-exec-9] c.e.cache.LocalCache - 缓存未命中 key=user:88277
+2026-09-16 09:07:48,470 WARN  [http-nio-8080-exec-10] c.e.db.ReplicationMonitor - 数据库主从延迟 seconds=42
+2026-09-16 09:08:15,588 WARN  [http-nio-8080-exec-1] c.e.gateway.SignatureFilter - 检测到异常请求签名 source=203.0.113.45 uri=/api/order 疑似重放请求
+2026-09-16 09:09:02,701 ERROR [http-nio-8080-exec-2] c.e.common.AlertNotifier - java.lang.OutOfMemoryError: Java heap space
+2026-09-16 09:09:44,830 INFO  [http-nio-8080-exec-3] c.e.order.OrderService - 订单创建成功 orderId=SO202609160023 amount=64.00

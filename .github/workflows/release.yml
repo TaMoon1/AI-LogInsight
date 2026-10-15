@@ -1,0 +1,93 @@
+name: Release
+
+# 打 tag（v*）或手动触发时：先跑规则门禁，再在 Windows 上构建便携版并附到 Release。
+# 说明：本工作流只在 GitHub Actions 上运行；本地等价命令见 README「自行构建便携版」。
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号（写进压缩包名，可带 v 前缀）"
+        required: true
+        default: "v1.0.0"
+
+permissions:
+  contents: write
+
+jobs:
+  gate:
+    name: 发布前门禁
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r backend/requirements.txt
+      - name: 规则质量门禁（TP/FP/FN + 元数据 + 规则库体检）
+        working-directory: backend
+        run: |
+          python scripts/eval_rules.py
+          python scripts/rule_health.py
+      - name: 核心回归
+        working-directory: backend
+        run: python -m pytest -q tests/test_analysis.py tests/test_detection_engine.py tests/test_parser_archives_xml.py
+
+  windows-portable:
+    name: 构建 Windows 便携版
+    needs: gate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 安装后端依赖（含构建期依赖）
+        working-directory: backend
+        run: |
+          python -m venv .venv
+          .venv\Scripts\python.exe -m pip install --upgrade pip
+          .venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-build.txt
+
+      - name: 构建前端
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: 解析版本号（去掉 v 前缀）
+        id: version
+        shell: bash
+        run: echo "value=$(echo '${{ github.event.inputs.version || github.ref_name }}' | sed 's/^v//')" >> "$GITHUB_OUTPUT"
+
+      - name: 打包便携版
+        working-directory: backend
+        run: .venv\Scripts\python.exe scripts\build_exe.py --version ${{ steps.version.outputs.value }}
+
+      - name: 冒烟验证（启动 exe → 规则 → 首页 → 上传）
+        working-directory: backend
+        run: .venv\Scripts\python.exe scripts\smoke_portable.py --port 8123
+
+      - name: 附到 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: backend/dist/AI-LogInsight-*-win64.zip
+          generate_release_notes: true
+
+      - name: 上传构建产物（便于排查）
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-LogInsight-win64
+          path: backend/dist/AI-LogInsight-*-win64.zip
+          if-no-files-found: warn

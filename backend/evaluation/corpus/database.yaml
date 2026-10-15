@@ -1,0 +1,230 @@
+family: 数据库（MySQL / PostgreSQL / MongoDB / Redis）
+description: |
+  正样本覆盖 db.bruteforce、db.bruteforce.success、db.sql_injection、db.destructive_query、
+  db.privilege_escalation、db.data_exfiltration、db.privileged_login；
+  负样本验证阈值以下不告警、正常查询不误报、且不串扰 SSH/Web 规则。
+cases:
+  - name: db-mysql-bruteforce-10-failures
+    note: MySQL 错误日志同源 10 次认证失败 → db.bruteforce（medium）
+    file: mysql.log
+    log: |
+      2026-09-17T10:00:00.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:01.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:02.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:03.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:04.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:05.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:06.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:07.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:08.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:09.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+    expect:
+      - rule: db.bruteforce
+        risk: medium
+        count: 10
+        source_ip: 10.0.0.8
+    forbid: [db.bruteforce.success, db.privileged_login, ssh.bruteforce]
+
+  - name: db-mysql-bruteforce-then-success
+    note: 失败聚集后成功登录（非特权账户）→ 升级为 high，且不再输出基础规则
+    file: mysql.log
+    log: |
+      2026-09-17T10:00:00.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:01.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:02.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:03.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:04.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:05.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:06.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:07.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:08.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:09.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:30.000000Z	1 Connect	appuser@10.0.0.8 on appdb
+    expect:
+      - rule: db.bruteforce.success
+        risk: high
+        count: 10
+        source_ip: 10.0.0.8
+    forbid: [db.bruteforce, db.privileged_login]
+
+  - name: db-mysql-sql-injection
+    note: 查询语句包含 UNION SELECT + information_schema → db.sql_injection
+    file: mysql.log
+    log: |
+      2026-09-17T10:00:01.000000Z	1 Query	SELECT * FROM users WHERE id = -1 UNION SELECT username,password FROM information_schema.columns
+    expect:
+      - rule: db.sql_injection
+        risk: high
+        count: 1
+    forbid: [db.data_exfiltration, web.sql_injection]
+
+  - name: db-mysql-destructive-query
+    note: DROP TABLE → db.destructive_query
+    file: mysql.log
+    log: |
+      2026-09-17T10:00:02.000000Z	1 Query	DROP TABLE audit_log
+    expect:
+      - rule: db.destructive_query
+        risk: high
+        count: 1
+    forbid: [db.data_exfiltration, db.sql_injection]
+
+  - name: db-mysql-delete-without-where
+    note: 不带 WHERE 的 DELETE 清空整表 → db.destructive_query
+    file: mysql.log
+    log: |
+      2026-09-17T10:00:05.000000Z	1 Query	DELETE FROM audit_log
+    expect:
+      - rule: db.destructive_query
+        risk: high
+        count: 1
+    forbid: [db.sql_injection, db.data_exfiltration]
+
+  - name: db-mysql-delete-with-where-negative
+    note: 带 WHERE 的 DELETE 属应用日常清理 → 不告警（避免把正常删行刷成 high 级误报）
+    file: mysql.log
+    log: |
+      2026-09-17T10:00:06.000000Z	1 Query	DELETE FROM sessions WHERE expired_at IS NOT NULL
+      2026-09-17T10:00:07.000000Z	1 Query	DELETE FROM cart_items WHERE user_id = 42
+    expect: []
+
+  - name: db-mysql-privilege-escalation
+    note: GRANT ALL → db.privilege_escalation
+    file: mysql.log
+    log: |
+      2026-09-17T10:00:03.000000Z	1 Query	GRANT ALL PRIVILEGES ON *.* TO 'evil'@'%'
+    expect:
+      - rule: db.privilege_escalation
+        risk: high
+        count: 1
+
+  - name: db-mysql-data-exfiltration
+    note: SELECT ... INTO OUTFILE → db.data_exfiltration
+    file: mysql.log
+    log: |
+      2026-09-17T10:00:04.000000Z	1 Query	SELECT id,password FROM users INTO OUTFILE '/tmp/dump.txt'
+    expect:
+      - rule: db.data_exfiltration
+        risk: medium
+        count: 1
+    forbid: [db.sql_injection]
+
+  - name: db-postgres-privileged-login
+    note: postgres 连接授权（postgres 账户）→ db.privileged_login
+    file: postgres.log
+    log: |
+      2026-09-17 10:00:00.123 CST [12345] LOG:  connection authorized: user=postgres database=appdb
+      2026-09-17 10:00:01.123 CST [12345] LOG:  statement: SELECT id FROM users WHERE id = 1
+    expect:
+      - rule: db.privileged_login
+        risk: medium
+        count: 1
+
+  - name: db-mongodb-bruteforce-10-failures
+    note: MongoDB 同源 10 次认证失败 → db.bruteforce
+    file: mongodb.log
+    log: |
+      {"t":{"$date":"2026-09-17T02:00:00.000+00:00"},"s":"I","c":"ACCESS","id":20249,"ctx":"conn1","msg":"Authentication failed","attr":{"user":"admin","db":"admin","remote":"10.0.0.8:5001"}}
+      {"t":{"$date":"2026-09-17T02:00:01.000+00:00"},"s":"I","c":"ACCESS","id":20249,"ctx":"conn2","msg":"Authentication failed","attr":{"user":"admin","db":"admin","remote":"10.0.0.8:5002"}}
+      {"t":{"$date":"2026-09-17T02:00:02.000+00:00"},"s":"I","c":"ACCESS","id":20249,"ctx":"conn3","msg":"Authentication failed","attr":{"user":"admin","db":"admin","remote":"10.0.0.8:5003"}}
+      {"t":{"$date":"2026-09-17T02:00:03.000+00:00"},"s":"I","c":"ACCESS","id":20249,"ctx":"conn4","msg":"Authentication failed","attr":{"user":"admin","db":"admin","remote":"10.0.0.8:5004"}}
+      {"t":{"$date":"2026-09-17T02:00:04.000+00:00"},"s":"I","c":"ACCESS","id":20249,"ctx":"conn5","msg":"Authentication failed","attr":{"user":"admin","db":"admin","remote":"10.0.0.8:5005"}}
+      {"t":{"$date":"2026-09-17T02:00:05.000+00:00"},"s":"I","c":"ACCESS","id":20249,"ctx":"conn6","msg":"Authentication failed","attr":{"user":"admin","db":"admin","remote":"10.0.0.8:5006"}}
+      {"t":{"$date":"2026-09-17T02:00:06.000+00:00"},"s":"I","c":"ACCESS","id":20249,"ctx":"conn7","msg":"Authentication failed","attr":{"user":"admin","db":"admin","remote":"10.0.0.8:5007"}}
+      {"t":{"$date":"2026-09-17T02:00:07.000+00:00"},"s":"I","c":"ACCESS","id":20249,"ctx":"conn8","msg":"Authentication failed","attr":{"user":"admin","db":"admin","remote":"10.0.0.8:5008"}}
+      {"t":{"$date":"2026-09-17T02:00:08.000+00:00"},"s":"I","c":"ACCESS","id":20249,"ctx":"conn9","msg":"Authentication failed","attr":{"user":"admin","db":"admin","remote":"10.0.0.8:5009"}}
+      {"t":{"$date":"2026-09-17T02:00:09.000+00:00"},"s":"I","c":"ACCESS","id":20249,"ctx":"conn10","msg":"Authentication failed","attr":{"user":"admin","db":"admin","remote":"10.0.0.8:5010"}}
+    expect:
+      - rule: db.bruteforce
+        risk: medium
+        count: 10
+        source_ip: 10.0.0.8
+    forbid: [ssh.bruteforce]
+
+  - name: db-redis-bruteforce-10-failures
+    note: Redis 同账户 10 次口令错误 → db.bruteforce
+    file: redis.log
+    log: |
+      1234:M 17 Sep 2026 10:00:00.123 # Invalid password for user 'default'
+      1234:M 17 Sep 2026 10:00:01.123 # Invalid password for user 'default'
+      1234:M 17 Sep 2026 10:00:02.123 # Invalid password for user 'default'
+      1234:M 17 Sep 2026 10:00:03.123 # Invalid password for user 'default'
+      1234:M 17 Sep 2026 10:00:04.123 # Invalid password for user 'default'
+      1234:M 17 Sep 2026 10:00:05.123 # Invalid password for user 'default'
+      1234:M 17 Sep 2026 10:00:06.123 # Invalid password for user 'default'
+      1234:M 17 Sep 2026 10:00:07.123 # Invalid password for user 'default'
+      1234:M 17 Sep 2026 10:00:08.123 # Invalid password for user 'default'
+      1234:M 17 Sep 2026 10:00:09.123 # Invalid password for user 'default'
+    expect:
+      - rule: db.bruteforce
+        risk: medium
+        count: 10
+    forbid: [db.privileged_login]
+
+  - name: db-mysql-normal-query
+    note: 正常查询不命中任何规则
+    file: mysql.log
+    log: |
+      2026-09-17T10:00:01.000000Z	1 Query	SELECT id,name FROM users WHERE id = 1
+      2026-09-17T10:00:02.000000Z	1 Query	UPDATE orders SET status = 'paid' WHERE id = 100
+    expect: []
+
+  - name: db-mysql-bruteforce-below-threshold
+    note: 5 次失败低于阈值 → 无事件
+    file: mysql.log
+    log: |
+      2026-09-17T10:00:00.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:01.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:02.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:03.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+      2026-09-17T10:00:04.123456Z 0 [Note] Access denied for user 'appuser'@'10.0.0.8' (using password: YES)
+    expect: []
+
+  - name: db-sqlserver-bruteforce-10-failures
+    note: SQL Server 同源 10 次登录失败（sa）→ db.bruteforce
+    file: sqlserver.log
+    log: |
+      2026-09-17 10:00:00.00 Logon       Login failed for user 'sa'. Reason: Password did not match that for the login provided. [CLIENT: 10.0.0.8]
+      2026-09-17 10:00:01.00 Logon       Login failed for user 'sa'. Reason: Password did not match that for the login provided. [CLIENT: 10.0.0.8]
+      2026-09-17 10:00:02.00 Logon       Login failed for user 'sa'. Reason: Password did not match that for the login provided. [CLIENT: 10.0.0.8]
+      2026-09-17 10:00:03.00 Logon       Login failed for user 'sa'. Reason: Password did not match that for the login provided. [CLIENT: 10.0.0.8]
+      2026-09-17 10:00:04.00 Logon       Login failed for user 'sa'. Reason: Password did not match that for the login provided. [CLIENT: 10.0.0.8]
+      2026-09-17 10:00:05.00 Logon       Login failed for user 'sa'. Reason: Password did not match that for the login provided. [CLIENT: 10.0.0.8]
+      2026-09-17 10:00:06.00 Logon       Login failed for user 'sa'. Reason: Password did not match that for the login provided. [CLIENT: 10.0.0.8]
+      2026-09-17 10:00:07.00 Logon       Login failed for user 'sa'. Reason: Password did not match that for the login provided. [CLIENT: 10.0.0.8]
+      2026-09-17 10:00:08.00 Logon       Login failed for user 'sa'. Reason: Password did not match that for the login provided. [CLIENT: 10.0.0.8]
+      2026-09-17 10:00:09.00 Logon       Login failed for user 'sa'. Reason: Password did not match that for the login provided. [CLIENT: 10.0.0.8]
+    expect:
+      - rule: db.bruteforce
+        risk: medium
+        count: 10
+        source_ip: 10.0.0.8
+
+  - name: db-oracle-bruteforce-10-failures
+    note: Oracle 10 次 ORA-01017 登录失败 → db.bruteforce
+    file: oracle.log
+    log: |
+      Thu Sep 17 10:00:00 2026
+      ORA-01017: invalid username/password; logon denied
+      Thu Sep 17 10:00:01 2026
+      ORA-01017: invalid username/password; logon denied
+      Thu Sep 17 10:00:02 2026
+      ORA-01017: invalid username/password; logon denied
+      Thu Sep 17 10:00:03 2026
+      ORA-01017: invalid username/password; logon denied
+      Thu Sep 17 10:00:04 2026
+      ORA-01017: invalid username/password; logon denied
+      Thu Sep 17 10:00:05 2026
+      ORA-01017: invalid username/password; logon denied
+      Thu Sep 17 10:00:06 2026
+      ORA-01017: invalid username/password; logon denied
+      Thu Sep 17 10:00:07 2026
+      ORA-01017: invalid username/password; logon denied
+      Thu Sep 17 10:00:08 2026
+      ORA-01017: invalid username/password; logon denied
+      Thu Sep 17 10:00:09 2026
+      ORA-01017: invalid username/password; logon denied
+    expect:
+      - rule: db.bruteforce
+        risk: medium
+        count: 10

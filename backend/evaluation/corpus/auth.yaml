@@ -1,0 +1,249 @@
+family: 认证类（SSH / Windows / 通用结构化）
+description: |
+  正样本覆盖 ssh.bruteforce、ssh.bruteforce.success、ssh.password_spray、ssh.privileged_login、
+  auth.bruteforce、auth.bruteforce.success、auth.password_spray；负样本验证阈值以下不告警、
+  同一账户重复失败不误报且不同日志类型之间不串扰。
+cases:
+  - name: ssh-20-failures-only
+    note: 20 次失败、无成功登录 → 命中基础暴力破解规则
+    file: auth.log
+    log: |
+      Sep 12 01:00:00 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:01 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:02 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:03 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:04 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:05 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:06 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:07 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:08 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:09 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:10 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:11 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:12 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:13 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:14 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:15 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:16 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:17 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:18 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:19 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+    expect:
+      - rule: ssh.bruteforce
+        risk: medium
+        count: 20
+        source_ip: 203.0.113.7
+    forbid: [ssh.bruteforce.success, ssh.privileged_login, auth.bruteforce]
+
+  - name: ssh-20-failures-then-success
+    note: 失败聚集后 2 分钟内成功登录 → 升级为 high，且不再输出基础规则
+    file: auth.log
+    log: |
+      Sep 12 01:00:00 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:01 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:02 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:03 host sshd[100]: Failed password for invalid user admin from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:04 host sshd[100]: Failed password for invalid user admin from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:05 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:06 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:07 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:08 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:09 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:10 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:11 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:12 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:13 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:14 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:15 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:16 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:17 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:18 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:00:19 host sshd[100]: Failed password for root from 203.0.113.7 port 22 ssh2
+      Sep 12 01:02:00 host sshd[100]: Accepted password for root from 203.0.113.7 port 22 ssh2
+    expect:
+      - rule: ssh.bruteforce.success
+        risk: high
+        count: 20
+        source_ip: 203.0.113.7
+      - rule: ssh.privileged_login
+        risk: medium
+        count: 1
+        source_ip: 203.0.113.7
+    forbid: [ssh.bruteforce]
+
+  - name: ssh-privileged-login-single
+    note: 单条高权限账户成功登录 → 只命中 privileged_login
+    file: auth.log
+    log: |
+      Sep 12 01:02:00 host sshd[100]: Accepted password for administrator from 203.0.113.8 port 22 ssh2
+    expect:
+      - rule: ssh.privileged_login
+        risk: medium
+        count: 1
+        source_ip: 203.0.113.8
+    forbid: [ssh.bruteforce, ssh.bruteforce.success]
+
+  - name: ssh-below-threshold-negative
+    note: 5 次失败（阈值 20）→ 不应产生任何事件
+    file: auth.log
+    log: |
+      Sep 12 01:00:00 host sshd[100]: Failed password for root from 203.0.113.9 port 22 ssh2
+      Sep 12 01:00:01 host sshd[100]: Failed password for root from 203.0.113.9 port 22 ssh2
+      Sep 12 01:00:02 host sshd[100]: Failed password for root from 203.0.113.9 port 22 ssh2
+      Sep 12 01:00:03 host sshd[100]: Failed password for root from 203.0.113.9 port 22 ssh2
+      Sep 12 01:00:04 host sshd[100]: Failed password for root from 203.0.113.9 port 22 ssh2
+    expect: []
+    forbid: []
+
+  - name: ssh-success-outside-association-window
+    note: 失败聚集后 40 分钟才成功（关联窗口 30 分钟）→ 只命中基础规则
+    file: auth.log
+    log: |
+      Sep 12 01:00:00 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:01 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:02 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:03 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:04 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:05 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:06 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:07 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:08 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:09 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:10 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:11 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:12 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:13 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:14 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:15 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:16 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:17 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:18 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:00:19 host sshd[100]: Failed password for root from 203.0.113.10 port 22 ssh2
+      Sep 12 01:40:00 host sshd[100]: Accepted password for root from 203.0.113.10 port 22 ssh2
+    expect:
+      - rule: ssh.bruteforce
+        risk: medium
+        count: 20
+        source_ip: 203.0.113.10
+      - rule: ssh.privileged_login
+        risk: medium
+        count: 1
+        source_ip: 203.0.113.10
+    forbid: [ssh.bruteforce.success]
+
+  - name: structured-json-auth-bruteforce-success
+    note: JSON 认证事件走 auth.* 规则，不应被误标为 SSH
+    file: vpn-events.json
+    log: |
+      {"@timestamp": "2026-09-12T05:00:00+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:01+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failed", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:02+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "失败", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:03+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "denied", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:04+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:05+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:06+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:07+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:08+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:09+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:10+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:11+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:12+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:13+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:14+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:15+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:16+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:17+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:18+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:00:19+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "login", "result": "failure", "message": "authentication failed"}
+      {"@timestamp": "2026-09-12T05:04:10+08:00", "src_ip": "198.51.100.30", "dst_ip": "10.0.0.20", "user": "vpnuser", "event_type": "signin", "result": "success", "message": "authentication succeeded"}
+    expect:
+      - rule: auth.bruteforce.success
+        risk: high
+        count: 20
+        source_ip: 198.51.100.30
+    forbid: [auth.bruteforce, ssh.bruteforce, ssh.bruteforce.success, web.404_scan]
+
+  - name: structured-csv-auth-bruteforce-only
+    note: 分号分隔 CSV（含中文表头）→ 走 auth.* 基础规则
+    file: bastion-auth.csv
+    log: |
+      时间;源IP;目的IP;账户;动作;结果
+      2026-09-12 06:00:00;203.0.113.90;10.0.0.30;admin;login;失败
+      2026-09-12 06:00:01;203.0.113.90;10.0.0.30;admin;login;失败
+      2026-09-12 06:00:02;203.0.113.90;10.0.0.30;admin;login;失败
+      2026-09-12 06:00:03;203.0.113.90;10.0.0.30;admin;login;失败
+      2026-09-12 06:00:04;203.0.113.90;10.0.0.30;admin;login;失败
+      2026-09-12 06:00:05;203.0.113.90;10.0.0.30;admin;login;失败
+      2026-09-12 06:00:06;203.0.113.90;10.0.0.30;admin;login;失败
+      2026-09-12 06:00:07;203.0.113.90;10.0.0.30;admin;login;失败
+      2026-09-12 06:00:08;203.0.113.90;10.0.0.30;admin;login;失败
+      2026-09-12 06:00:09;203.0.113.90;10.0.0.30;admin;login;失败
+      2026-09-12 06:00:10;203.0.113.90;10.0.0.30;admin;login;拒绝
+      2026-09-12 06:00:11;203.0.113.90;10.0.0.30;admin;login;拒绝
+      2026-09-12 06:00:12;203.0.113.90;10.0.0.30;admin;login;拒绝
+      2026-09-12 06:00:13;203.0.113.90;10.0.0.30;admin;login;拒绝
+      2026-09-12 06:00:14;203.0.113.90;10.0.0.30;admin;login;拒绝
+      2026-09-12 06:00:15;203.0.113.90;10.0.0.30;admin;login;拒绝
+      2026-09-12 06:00:16;203.0.113.90;10.0.0.30;admin;login;拒绝
+      2026-09-12 06:00:17;203.0.113.90;10.0.0.30;admin;login;拒绝
+      2026-09-12 06:00:18;203.0.113.90;10.0.0.30;admin;login;拒绝
+      2026-09-12 06:00:19;203.0.113.90;10.0.0.30;admin;login;拒绝
+    expect:
+      - rule: auth.bruteforce
+        risk: medium
+        count: 20
+        source_ip: 203.0.113.90
+    forbid: [auth.bruteforce.success, ssh.bruteforce]
+
+  - name: ssh-password-spray
+    note: 同一来源对多个账户低频失败认证 → 密码喷洒；未达到暴力破解阈值
+    file: auth.log
+    log: |
+      Sep 12 07:00:00 host sshd[100]: Failed password for invalid user alice from 203.0.113.60 port 22 ssh2
+      Sep 12 07:00:20 host sshd[100]: Failed password for invalid user bob from 203.0.113.60 port 22 ssh2
+      Sep 12 07:00:40 host sshd[100]: Failed password for invalid user carol from 203.0.113.60 port 22 ssh2
+      Sep 12 07:01:00 host sshd[100]: Failed password for invalid user dave from 203.0.113.60 port 22 ssh2
+      Sep 12 07:01:20 host sshd[100]: Failed password for invalid user erin from 203.0.113.60 port 22 ssh2
+      Sep 12 07:01:40 host sshd[100]: Failed password for invalid user alice from 203.0.113.60 port 22 ssh2
+      Sep 12 07:02:00 host sshd[100]: Failed password for invalid user bob from 203.0.113.60 port 22 ssh2
+      Sep 12 07:02:20 host sshd[100]: Failed password for invalid user carol from 203.0.113.60 port 22 ssh2
+    expect:
+      - rule: ssh.password_spray
+        risk: medium
+        count: 8
+        source_ip: 203.0.113.60
+    forbid: [ssh.bruteforce, ssh.bruteforce.success, auth.password_spray]
+
+  - name: structured-json-auth-password-spray
+    note: 结构化认证日志中同一来源尝试多个账户 → auth.password_spray
+    file: vpn-spray.json
+    log: |
+      {"@timestamp": "2026-09-12T07:30:00+08:00", "src_ip": "198.51.100.61", "user": "alice", "event_type": "login", "result": "failure"}
+      {"@timestamp": "2026-09-12T07:30:15+08:00", "src_ip": "198.51.100.61", "user": "bob", "event_type": "login", "result": "failure"}
+      {"@timestamp": "2026-09-12T07:30:30+08:00", "src_ip": "198.51.100.61", "user": "carol", "event_type": "login", "result": "failure"}
+      {"@timestamp": "2026-09-12T07:30:45+08:00", "src_ip": "198.51.100.61", "user": "dave", "event_type": "login", "result": "failure"}
+      {"@timestamp": "2026-09-12T07:31:00+08:00", "src_ip": "198.51.100.61", "user": "erin", "event_type": "login", "result": "failure"}
+      {"@timestamp": "2026-09-12T07:31:15+08:00", "src_ip": "198.51.100.61", "user": "alice", "event_type": "login", "result": "failure"}
+      {"@timestamp": "2026-09-12T07:31:30+08:00", "src_ip": "198.51.100.61", "user": "bob", "event_type": "login", "result": "failure"}
+      {"@timestamp": "2026-09-12T07:31:45+08:00", "src_ip": "198.51.100.61", "user": "carol", "event_type": "login", "result": "failure"}
+    expect:
+      - rule: auth.password_spray
+        risk: medium
+        count: 8
+        source_ip: 198.51.100.61
+    forbid: [auth.bruteforce, auth.bruteforce.success, ssh.password_spray]
+
+  - name: ssh-repeated-single-account-negative
+    note: 同一账户重复失败但账户数不足 → 不应触发密码喷洒
+    file: auth.log
+    log: |
+      Sep 12 08:00:00 host sshd[100]: Failed password for root from 203.0.113.62 port 22 ssh2
+      Sep 12 08:00:20 host sshd[100]: Failed password for root from 203.0.113.62 port 22 ssh2
+      Sep 12 08:00:40 host sshd[100]: Failed password for root from 203.0.113.62 port 22 ssh2
+      Sep 12 08:01:00 host sshd[100]: Failed password for root from 203.0.113.62 port 22 ssh2
+      Sep 12 08:01:20 host sshd[100]: Failed password for root from 203.0.113.62 port 22 ssh2
+      Sep 12 08:01:40 host sshd[100]: Failed password for root from 203.0.113.62 port 22 ssh2
+      Sep 12 08:02:00 host sshd[100]: Failed password for root from 203.0.113.62 port 22 ssh2
+      Sep 12 08:02:20 host sshd[100]: Failed password for root from 203.0.113.62 port 22 ssh2
+    expect: []
+    forbid: [ssh.password_spray, auth.password_spray, ssh.bruteforce]

@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend-core:
+    name: 后端核心门禁
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r backend/requirements.txt
+      - name: 解析与检测
+        working-directory: backend
+        run: python -m pytest -q tests/test_analysis.py tests/test_detection_engine.py tests/test_evtx_standard_fields.py tests/test_parser_archives_xml.py
+      - name: 规则质量门禁（内置规则 TP/FP/FN + 元数据 + 规则库体检）
+        working-directory: backend
+        run: |
+          python scripts/eval_rules.py
+          python -m pytest -q tests/test_rule_metadata.py tests/test_rule_health.py
+      - name: AI 最小回归集（确定性替身）
+        working-directory: backend
+        run: python scripts/eval_ai.py --smoke
+
+  frontend-build:
+    name: 前端构建
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: 安装依赖
+        working-directory: frontend
+        run: npm ci
+      - name: 构建（含 vue-tsc 类型检查）
+        working-directory: frontend
+        run: npm run build
+
+  full-suite:
+    name: 全量测试（手动触发）
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r backend/requirements.txt
+      - name: 完整 pytest 套件
+        working-directory: backend
+        run: python -m pytest -q

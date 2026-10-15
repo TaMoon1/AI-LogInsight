@@ -1,0 +1,12 @@
+2026-09-17 10:00:00.123 CST [12000] LOG:  connection authorized: user=postgres database=appdb host=192.168.1.60
+2026-09-17 10:00:01.123 CST [12001] [20001] FATAL:  password authentication failed for user "postgres"
+2026-09-17 10:00:02.123 CST [12002] [20002] FATAL:  password authentication failed for user "postgres"
+2026-09-17 10:00:03.123 CST [12003] [20003] FATAL:  password authentication failed for user "postgres"
+2026-09-17 10:00:04.123 CST [12004] [20004] FATAL:  password authentication failed for user "postgres"
+2026-09-17 10:00:05.123 CST [12005] [20005] FATAL:  password authentication failed for user "postgres"
+2026-09-17 10:00:06.123 CST [12006] [20006] FATAL:  password authentication failed for user "postgres"
+2026-09-17 10:00:07.123 CST [12007] [20007] FATAL:  password authentication failed for user "postgres"
+2026-09-17 10:00:08.123 CST [12008] [20008] FATAL:  password authentication failed for user "postgres"
+2026-09-17 10:00:09.123 CST [12009] [20009] FATAL:  password authentication failed for user "postgres"
+2026-09-17 10:00:10.123 CST [12010] [20010] FATAL:  password authentication failed for user "postgres"
+2026-09-17 10:00:11.123 CST [12011] LOG:  statement: SELECT * FROM pg_shadow

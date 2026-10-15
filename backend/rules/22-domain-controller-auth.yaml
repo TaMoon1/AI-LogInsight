@@ -1,0 +1,61 @@
+source: builtin
+
+# 文档级元数据：本文件内全部规则共用；规则级声明优先（见 rules_engine.build_rule）。
+metadata:
+  author: AI-LogInsight
+  version: "1.0"
+  license: proprietary
+  validation_status: validated
+
+rules:
+  - id: windows.auth_export.suspicious_ip
+    title: 域控异常 IP 登录/访问候选
+    description: 安全平台导出表标记来源 IP 为异常 IP，输出域控侧异常认证或访问候选。
+    level: high
+    logsource:
+      log_types: [windows_auth_export]
+      display_log_types: [windows_auth_export]
+    detection:
+      where:
+        - {field: risk_level, op: equals, value: 高危}
+        - {field: login_type, op: equals, value: 异常IP}
+        - {field: source_ip, op: exists}
+        - {field: target_asset, op: exists}
+      aggregate:
+        group_by: [source_ip, target_asset, login_type]
+        window_seconds: 315360000
+        bucket: true
+    event:
+      type: domain_controller_suspicious_ip
+      name: 域控侧异常 IP 认证/访问候选
+      level: high
+      count: occurrence_sum
+      time: last_seen
+      evidence: window_head
+      summary: "{ip} 以 {username} 账户通过 {service_type} 访问 {asset}，被导出平台标记为异常IP，风险等级为 {risk_level}，累计发生 {occurrence_count} 次。该证据支持域控侧异常认证/访问候选，但仅凭导出表无法确认已成功入侵。"
+
+  - id: windows.auth_export.abnormal_time
+    title: 域控异常时间登录/访问候选
+    description: 安全平台导出表标记来源行为发生在异常时间，输出需要核实的域控侧异常认证或访问候选。
+    level: medium
+    logsource:
+      log_types: [windows_auth_export]
+      display_log_types: [windows_auth_export]
+    detection:
+      where:
+        - {field: risk_level, op: equals, value: 高危}
+        - {field: login_type, op: equals, value: 异常时间}
+        - {field: source_ip, op: exists}
+        - {field: target_asset, op: exists}
+      aggregate:
+        group_by: [source_ip, target_asset, login_type]
+        window_seconds: 315360000
+        bucket: true
+    event:
+      type: domain_controller_abnormal_time
+      name: 域控侧异常时间认证/访问候选
+      level: medium
+      count: occurrence_sum
+      time: last_seen
+      evidence: window_head
+      summary: "{ip} 以 {username} 账户通过 {service_type} 访问 {asset}，被导出平台标记为异常时间，风险等级为 {risk_level}，累计发生 {occurrence_count} 次。该证据支持异常时间行为候选，仍需结合原始 Windows 安全日志核实登录结果和行为主体。"

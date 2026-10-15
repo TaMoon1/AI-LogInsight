@@ -1,0 +1,8 @@
+2026-09-17T10:00:00.000000Z	1 Connect	appuser@192.168.1.50 on appdb
+2026-09-17T10:00:01.000000Z	1 Query	SELECT id, name FROM customers WHERE id = 1024
+2026-09-17T10:00:02.000000Z	1 Query	SELECT * FROM users WHERE id = -1 UNION SELECT username, password FROM information_schema.columns
+2026-09-17T10:00:03.000000Z	1 Query	UPDATE orders SET status = 'paid' WHERE id = 500
+2026-09-17T10:00:04.000000Z	1 Query	DROP TABLE audit_log
+2026-09-17T10:00:05.000000Z	1 Query	SELECT id, password FROM users INTO OUTFILE '/tmp/dump.txt'
+2026-09-17T10:00:06.000000Z	1 Query	GRANT ALL PRIVILEGES ON *.* TO 'evil'@'%'
+2026-09-17T10:00:07.000000Z	1 Quit
